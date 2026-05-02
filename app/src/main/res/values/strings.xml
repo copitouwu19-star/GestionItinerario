@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Agenda Pro</string>
+    <string name="dashboard">Panel de Control</string>
+    <string name="inventory">Inventario</string>
+    <string name="clients">Clientes</string>
+    <string name="services">Servicios</string>
+    <string name="agenda">Agenda</string>
+    <string name="reminders">Recordatorios</string>
+</resources>
