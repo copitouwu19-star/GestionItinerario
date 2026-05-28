@@ -11,6 +11,7 @@ import com.gestion.itinerario.R
 import com.gestion.itinerario.data.repository.AppointmentRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
 
 @HiltWorker
 class AppointmentReminderWorker @AssistedInject constructor(
@@ -26,12 +27,9 @@ class AppointmentReminderWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         createChannel()
-        val upcoming = mutableListOf<String>()
-        repository.getTodayAppointments().collect { list ->
-            list.forEach { upcoming.add("Cita: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it.dateTime))}") }
-        }
-        if (upcoming.isNotEmpty()) {
-            showNotification("📅 Citas de hoy", "${upcoming.size} cita(s) programada(s) para hoy")
+        val list = repository.getTodayAppointments().first()
+        if (list.isNotEmpty()) {
+            showNotification("📅 Citas de hoy", "${list.size} cita(s) programada(s) para hoy")
         }
         return Result.success()
     }
