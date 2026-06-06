@@ -1,5 +1,8 @@
 package com.gestion.itinerario.ui.inventory
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gestion.itinerario.data.entity.Equipment
 import com.gestion.itinerario.data.entity.EquipmentStatus
+import com.gestion.itinerario.data.entity.ItemCategory
 import com.gestion.itinerario.data.entity.MovementType
 import com.gestion.itinerario.data.entity.SparePart
 import com.gestion.itinerario.ui.theme.*
@@ -45,10 +49,12 @@ fun InventoryScreen(
     viewModel: InventoryViewModel = hiltViewModel()
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Equipos", "Repuestos", "Stock Bajo")
+    val tabs = listOf("Equipos", "Repuestos", "Herramientas", "Stock Bajo")
     val equipment by viewModel.equipment.collectAsStateWithLifecycle()
     val spareParts by viewModel.spareParts.collectAsStateWithLifecycle()
     val lowStock by viewModel.lowStock.collectAsStateWithLifecycle()
+    val repuestos = spareParts.filter { it.category == ItemCategory.SPARE_PART }
+    val herramientas = spareParts.filter { it.category == ItemCategory.TOOL }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showEquipmentDialog by remember { mutableStateOf(false) }
@@ -117,11 +123,15 @@ fun InventoryScreen(
                 0 -> EquipmentList(equipment,
                     onEdit = { editEquipment = it; showEquipmentDialog = true },
                     onDelete = viewModel::deleteEquipment)
-                1 -> SparePartsList(spareParts,
+                1 -> SparePartsList(repuestos,
                     onEdit = { editSpare = it; showSpareDialog = true },
                     onDelete = viewModel::deleteSparePart,
                     onMovement = { sp, t, q, n -> viewModel.registerMovement(sp, t, q, n) })
-                2 -> LowStockList(lowStock,
+                2 -> SparePartsList(herramientas,
+                    onEdit = { editSpare = it; showSpareDialog = true },
+                    onDelete = viewModel::deleteSparePart,
+                    onMovement = { sp, t, q, n -> viewModel.registerMovement(sp, t, q, n) })
+                3 -> LowStockList(lowStock,
                     onMovement = { sp, t, q, n -> viewModel.registerMovement(sp, t, q, n) })
             }
         }
@@ -483,25 +493,75 @@ fun EquipmentFormDialog(initial: Equipment?, onDismiss: () -> Unit, onSave: (Equ
 
 @Composable
 fun SparePartFormDialog(initial: SparePart?, onDismiss: () -> Unit, onSave: (SparePart) -> Unit) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var qty by remember { mutableStateOf(initial?.quantity?.toString() ?: "0") }
-    var minStock by remember { mutableStateOf(initial?.minStock?.toString() ?: "5") }
-    var unit by remember { mutableStateOf(initial?.unit ?: "unidad") }
+    var name        by remember { mutableStateOf(initial?.name ?: "") }
+    var description by remember { mutableStateOf(initial?.description ?: "") }
+    var qty         by remember { mutableStateOf(initial?.quantity?.toString() ?: "0") }
+    var minStock    by remember { mutableStateOf(initial?.minStock?.toString() ?: "5") }
+    var unit        by remember { mutableStateOf(initial?.unit ?: "unidad") }
+    var category    by remember { mutableStateOf(initial?.category ?: ItemCategory.SPARE_PART) }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { _: Uri? -> /* foto subida en producción via Storage — placeholder */ }
 
     AlertDialog(onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Nuevo Repuesto" else "Editar Repuesto", fontWeight = FontWeight.Bold) },
+        title = { Text(if (initial == null) "Nuevo Ítem de Inventario" else "Editar Ítem", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre del repuesto *") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = qty, onValueChange = { qty = it }, label = { Text("Cantidad actual") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = minStock, onValueChange = { minStock = it }, label = { Text("Stock mínimo") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Unidad (ej: unidad, kg)") }, modifier = Modifier.fillMaxWidth())
+            Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Categoría
+                Text("Tipo:", style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = category == ItemCategory.SPARE_PART,
+                        onClick = { category = ItemCategory.SPARE_PART },
+                        label = { Text("Repuesto") },
+                        leadingIcon = if (category == ItemCategory.SPARE_PART) {{
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp))
+                        }} else null
+                    )
+                    FilterChip(
+                        selected = category == ItemCategory.TOOL,
+                        onClick = { category = ItemCategory.TOOL },
+                        label = { Text("Herramienta") },
+                        leadingIcon = if (category == ItemCategory.TOOL) {{
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp))
+                        }} else null
+                    )
+                }
+                OutlinedTextField(value = name, onValueChange = { name = it },
+                    label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(value = description, onValueChange = { description = it },
+                    label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = qty, onValueChange = { qty = it.filter { c -> c.isDigit() } },
+                    label = { Text("Cantidad actual") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(value = minStock, onValueChange = { minStock = it.filter { c -> c.isDigit() } },
+                    label = { Text("Stock mínimo") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(value = unit, onValueChange = { unit = it },
+                    label = { Text("Unidad (ej: unidad, kg, caja)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                // Foto
+                OutlinedButton(onClick = { photoLauncher.launch("image/*") }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.AddPhotoAlternate, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Agregar foto (opcional)")
+                }
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(SparePart(name = name, quantity = qty.toIntOrNull() ?: 0,
-                minStock = minStock.toIntOrNull() ?: 5, unit = unit)) },
-                enabled = name.isNotBlank()) { Text("Guardar") }
+            Button(onClick = {
+                onSave(SparePart(
+                    id          = initial?.id ?: "",
+                    name        = name,
+                    description = description,
+                    quantity    = qty.toIntOrNull() ?: 0,
+                    minStock    = minStock.toIntOrNull() ?: 5,
+                    unit        = unit,
+                    category    = category,
+                    photoUrl    = initial?.photoUrl ?: "",
+                    createdAt   = initial?.createdAt ?: System.currentTimeMillis()
+                ))
+            }, enabled = name.isNotBlank()) { Text("Guardar") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )

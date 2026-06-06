@@ -1,15 +1,15 @@
 package com.gestion.itinerario.data.entity
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+enum class ItemCategory { SPARE_PART, TOOL }
 
-@Entity(tableName = "spare_parts")
 data class SparePart(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
+    val id: String = "",
+    val name: String = "",
     val description: String = "",
     val quantity: Int = 0,
     val minStock: Int = 5,
     val unit: String = "unidad",
+    val category: ItemCategory = ItemCategory.SPARE_PART,
+    val photoUrl: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )

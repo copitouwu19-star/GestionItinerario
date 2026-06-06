@@ -2,6 +2,7 @@ package com.gestion.itinerario.ui.reminders
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.gestion.itinerario.data.entity.IntervalUnit
 import com.gestion.itinerario.data.entity.MaintenanceReminder
 import com.gestion.itinerario.data.repository.ReminderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +25,10 @@ class ReminderViewModel @Inject constructor(
     fun markDone(r: MaintenanceReminder) = viewModelScope.launch {
         val cal = Calendar.getInstance()
         val last = cal.timeInMillis
-        cal.add(Calendar.MONTH, r.intervalMonths)
+        when (r.intervalUnit) {
+            IntervalUnit.WEEKS  -> cal.add(Calendar.WEEK_OF_YEAR, r.intervalValue)
+            IntervalUnit.MONTHS -> cal.add(Calendar.MONTH, r.intervalValue)
+        }
         repo.update(r.copy(lastServiceDate = last, nextServiceDate = cal.timeInMillis))
     }
 }

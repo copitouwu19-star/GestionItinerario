@@ -1,21 +1,26 @@
 package com.gestion.itinerario.data.entity
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-
 enum class ServiceType { MAINTENANCE, REPAIR, INSTALLATION }
 enum class ServiceStatus { PENDING, IN_PROGRESS, COMPLETED }
 
-@Entity(tableName = "service_orders")
+enum class PaymentMethod { CASH, TRANSFER, NONE }
+enum class PaymentStatus { PAID, PENDING, NONE }
+
 data class ServiceOrder(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val equipmentId: Long,
-    val clientId: Long,
-    val type: ServiceType,
-    val description: String,
+    val id: String = "",
+    val equipmentId: String = "",
+    val clientId: String = "",
+    val type: ServiceType = ServiceType.MAINTENANCE,
+    val description: String = "",
     val diagnosis: String = "",
     val status: ServiceStatus = ServiceStatus.PENDING,
+    val equipmentType: String = "",
     val totalCost: Double = 0.0,
+    val paymentMethod: PaymentMethod = PaymentMethod.NONE,
+    val paymentStatus: PaymentStatus = PaymentStatus.NONE,
+    val photosBefore: List<String> = emptyList(),
+    val photosAfter: List<String> = emptyList(),
+    val invoiceId: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null
 )

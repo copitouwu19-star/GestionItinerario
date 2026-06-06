@@ -6,76 +6,75 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import com.gestion.itinerario.data.db.AppDatabase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.gestion.itinerario.data.entity.AppointmentStatus
 import com.gestion.itinerario.data.entity.ServiceType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-/**
- * Se dispara cuando el dispositivo arranca (BOOT_COMPLETED).
- * Reprograma todas las alarmas de citas futuras para que no se pierdan
- * al reiniciar el teléfono.
- */
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
         CoroutineScope(Dispatchers.IO).launch {
-            val db = AppDatabase::class.java.let {
-                androidx.room.Room.databaseBuilder(context.applicationContext, it, "gestion_itinerario.db")
-                    .addMigrations(
-                        com.gestion.itinerario.data.db.MIGRATION_2_3,
-                        com.gestion.itinerario.data.db.MIGRATION_3_4,
-                        com.gestion.itinerario.data.db.MIGRATION_4_5
-                    )
-                    .build()
-            }
-            val now = System.currentTimeMillis()
-            val upcoming = db.appointmentDao().getInRange(now, now + TimeUnit.DAYS.toMillis(365))
-                .filter { it.status == AppointmentStatus.SCHEDULED }
+            try {
+                val now = System.currentTimeMillis()
+                val snap = FirebaseFirestore.getInstance()
+                    .collection("users").document(uid)
+                    .collection("appointments")
+                    .whereEqualTo("status", AppointmentStatus.SCHEDULED.name)
+                    .get().await()
 
-            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-
-            upcoming.forEach { a ->
-                val hora = sdf.format(Date(a.dateTime))
-                val tipo = when (a.serviceType) {
-                    ServiceType.MAINTENANCE -> "Mantenimiento"
-                    ServiceType.REPAIR -> "Reparación"
-                    ServiceType.INSTALLATION -> "Instalación"
+                val upcoming = snap.documents.mapNotNull { doc ->
+                    val dateTime = doc.getLong("dateTime") ?: return@mapNotNull null
+                    if (dateTime <= now) return@mapNotNull null
+                    val id = doc.id
+                    val serviceType = try {
+                        ServiceType.valueOf(doc.getString("serviceType") ?: "MAINTENANCE")
+                    } catch (e: Exception) { ServiceType.MAINTENANCE }
+                    val notes = doc.getString("notes") ?: ""
+                    Triple(id, dateTime, Pair(serviceType, notes))
                 }
-                val clientName = a.notes.substringBefore(" —").ifBlank { "Cliente" }
 
-                // Alarma 1: 24 horas antes
-                scheduleAlarm(context, am, (a.id * 10).toInt(),
-                    a.dateTime - TimeUnit.HOURS.toMillis(24),
-                    "Recordatorio — Mañana", "$tipo con $clientName a las $hora")
+                val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-                // Alarma 2: 5 horas antes
-                scheduleAlarm(context, am, (a.id * 10 + 1).toInt(),
-                    a.dateTime - TimeUnit.HOURS.toMillis(5),
-                    "Recordatorio — En 5 horas", "$tipo con $clientName a las $hora")
+                upcoming.forEach { (id, dateTime, extra) ->
+                    val (serviceType, notes) = extra
+                    val hora = sdf.format(Date(dateTime))
+                    val tipo = when (serviceType) {
+                        ServiceType.MAINTENANCE -> "Mantenimiento"
+                        ServiceType.REPAIR -> "Reparación"
+                        ServiceType.INSTALLATION -> "Instalación"
+                    }
+                    val clientName = notes.substringBefore(" —").ifBlank { "Cliente" }
+                    val rc = id.hashCode()
 
-                // Alarma 3: en el momento exacto de la cita (siempre, si la cita es futura)
-                scheduleAlarm(context, am, (a.id * 10 + 2).toInt(),
-                    a.dateTime,
-                    "¡Ahora! $tipo", "$tipo con $clientName programado para ahora ($hora)")
+                    scheduleAlarm(context, am, rc + 1000,
+                        dateTime - TimeUnit.HOURS.toMillis(5),
+                        "Recordatorio — En 5 horas", "$tipo con $clientName a las $hora")
+
+                    scheduleAlarm(context, am, rc,
+                        dateTime,
+                        "¡Ahora! $tipo", "$tipo con $clientName programado para ahora ($hora)")
+                }
+            } catch (e: Exception) {
+                // boot re-scheduling is best-effort
             }
-            db.close()
         }
     }
 
-    private fun scheduleAlarm(
-        context: Context, am: AlarmManager, rc: Int,
-        triggerAt: Long, title: String, message: String
-    ) {
+    private fun scheduleAlarm(context: Context, am: AlarmManager, rc: Int, triggerAt: Long, title: String, message: String) {
         if (triggerAt <= System.currentTimeMillis()) return
         val intent = Intent(context, ReminderAlarmReceiver::class.java).apply {
             putExtra(ReminderAlarmReceiver.EXTRA_TITLE, title)
@@ -86,17 +85,13 @@ class BootReceiver : BroadcastReceiver() {
             context, rc, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        // Intentar alarma exacta; si no hay permiso, usar inexacta como fallback garantizado
-        val canUseExact = when {
+        val canExact = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> am.canScheduleExactAlarms()
             else -> true
         }
-        if (canUseExact) {
-            try {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            } catch (e: SecurityException) {
-                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            }
+        if (canExact) {
+            try { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi) }
+            catch (e: SecurityException) { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi) }
         } else {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
         }

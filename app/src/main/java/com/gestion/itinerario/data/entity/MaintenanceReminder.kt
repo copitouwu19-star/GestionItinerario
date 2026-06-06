@@ -1,15 +1,16 @@
 package com.gestion.itinerario.data.entity
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+enum class IntervalUnit { WEEKS, MONTHS }
 
-@Entity(tableName = "maintenance_reminders")
 data class MaintenanceReminder(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val equipmentId: Long,
-    val intervalMonths: Int,
-    val lastServiceDate: Long,
-    val nextServiceDate: Long,
+    val id: String = "",
+    val equipmentId: String = "",
+    val clientId: String = "",
+    val intervalValue: Int = 3,
+    val intervalUnit: IntervalUnit = IntervalUnit.MONTHS,
+    val intervalMonths: Int = 3,
+    val lastServiceDate: Long = 0L,
+    val nextServiceDate: Long = 0L,
     val notes: String = "",
     val isActive: Boolean = true
 )

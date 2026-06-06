@@ -1,34 +1,106 @@
 package com.gestion.itinerario.data.repository
 
-import com.gestion.itinerario.data.db.AppointmentDao
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.gestion.itinerario.data.entity.Appointment
+import com.gestion.itinerario.data.entity.AppointmentStatus
+import com.gestion.itinerario.data.entity.ServiceType
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 import java.util.Calendar
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AppointmentRepository @Inject constructor(private val dao: AppointmentDao) {
-    fun getAll(): Flow<List<Appointment>> = dao.getAll()
-    fun getUpcoming(from: Long = System.currentTimeMillis()): Flow<List<Appointment>> = dao.getUpcoming(from)
-    fun getTodayAppointments(): Flow<List<Appointment>> {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
-        val start = cal.timeInMillis
-        cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59)
-        val end = cal.timeInMillis
-        return dao.getTodayAppointments(start, end)
+class AppointmentRepository @Inject constructor(private val db: FirebaseFirestore) {
+
+    private val uid get() = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    private val col get() = db.collection("users").document(uid).collection("appointments")
+
+    fun getAll(): Flow<List<Appointment>> = callbackFlow {
+        if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
+        val reg = col.orderBy("dateTime").addSnapshotListener { snap, err ->
+            if (err != null) { close(err); return@addSnapshotListener }
+            trySend(snap?.documents?.mapNotNull { it.toAppointment() } ?: emptyList())
+        }
+        awaitClose { reg.remove() }
     }
-    fun countToday(): Flow<Int> {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
-        val start = cal.timeInMillis
-        cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59)
-        val end = cal.timeInMillis
-        return dao.countToday(start, end)
+
+    fun getUpcoming(from: Long = System.currentTimeMillis()): Flow<List<Appointment>> =
+        getAll().map { list -> list.filter { it.dateTime >= from && it.status == AppointmentStatus.SCHEDULED } }
+
+    fun getTodayAppointments(): Flow<List<Appointment>> = getAll().map { list ->
+        val (start, end) = todayRange()
+        list.filter { it.dateTime in start..end }
     }
-    suspend fun getById(id: Long): Appointment? = dao.getById(id)
-    suspend fun save(app: Appointment) = dao.insert(app)
-    suspend fun update(app: Appointment) = dao.update(app)
-    suspend fun delete(app: Appointment) = dao.delete(app)
+
+    fun countToday(): Flow<Int> = getTodayAppointments().map { it.size }
+    fun countUpcoming(): Flow<Int> = getUpcoming().map { it.size }
+    fun countPending(): Flow<Int> = getAll().map { list -> list.count { it.status == AppointmentStatus.SCHEDULED } }
+    fun countInProgress(): Flow<Int> = getAll().map { list -> list.count { it.status == AppointmentStatus.IN_PROGRESS } }
+    fun countCompleted(): Flow<Int> = getAll().map { list -> list.count { it.status == AppointmentStatus.COMPLETED } }
+    fun countCompletedToday(): Flow<Int> = getTodayAppointments().map { list -> list.count { it.status == AppointmentStatus.COMPLETED } }
+
+    suspend fun checkConflict(dateTime: Long, excludeId: String = ""): Appointment? {
+        val from = dateTime - TimeUnit.MINUTES.toMillis(1)
+        val to = dateTime + TimeUnit.MINUTES.toMillis(1)
+        return col.get().await().documents.mapNotNull { it.toAppointment() }
+            .firstOrNull { it.id != excludeId && it.status == AppointmentStatus.SCHEDULED && it.dateTime in from..to }
+    }
+
+    suspend fun getInRange(from: Long, to: Long): List<Appointment> =
+        col.get().await().documents.mapNotNull { it.toAppointment() }.filter { it.dateTime in from..to }
+
+    suspend fun getById(id: String): Appointment? = col.document(id).get().await().toAppointment()
+
+    suspend fun save(app: Appointment): String {
+        val ref = if (app.id.isEmpty()) col.document() else col.document(app.id)
+        ref.set(app.toMap()).await()
+        return ref.id
+    }
+
+    suspend fun update(app: Appointment) { col.document(app.id).set(app.toMap()).await() }
+    suspend fun delete(app: Appointment) { col.document(app.id).delete().await() }
+
+    private fun todayRange(): Pair<Long, Long> {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+        val start = cal.timeInMillis
+        cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999)
+        return Pair(start, cal.timeInMillis)
+    }
+}
+
+private fun Appointment.toMap(): Map<String, Any?> = mapOf(
+    "clientId" to clientId,
+    "equipmentId" to equipmentId,
+    "dateTime" to dateTime,
+    "serviceType" to serviceType.name,
+    "status" to status.name,
+    "notes" to notes,
+    "equipmentType" to equipmentType,
+    "createdAt" to createdAt
+)
+
+private fun com.google.firebase.firestore.DocumentSnapshot.toAppointment(): Appointment? {
+    if (!exists()) return null
+    return try {
+        Appointment(
+            id = id,
+            clientId = getString("clientId") ?: "",
+            equipmentId = getString("equipmentId"),
+            dateTime = getLong("dateTime") ?: 0L,
+            serviceType = ServiceType.valueOf(getString("serviceType") ?: "MAINTENANCE"),
+            status = AppointmentStatus.valueOf(getString("status") ?: "SCHEDULED"),
+            notes = getString("notes") ?: "",
+            equipmentType = getString("equipmentType") ?: "",
+            createdAt = getLong("createdAt") ?: System.currentTimeMillis()
+        )
+    } catch (e: Exception) { null }
 }

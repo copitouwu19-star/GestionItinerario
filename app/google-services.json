@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "321606555165",
+    "project_id": "gestion-1dd21",
+    "storage_bucket": "gestion-1dd21.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:321606555165:android:37be29055e4d21649618f4",
+        "android_client_info": {
+          "package_name": "com.gestion.itinerario"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWLshgdikPAAKODSJz_PV9jgapqXNsELo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,4 +1,0 @@
-com.gestion.itinerario.test.app-androidTest-0 C:\Users\sofia\Downloads\app_gestion_itinerario\app\build\generated\res\resValues\androidTest\debug
-com.gestion.itinerario.test.app-mergeDebugAndroidTestResources-1 C:\Users\sofia\Downloads\app_gestion_itinerario\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
-com.gestion.itinerario.test.app-mergeDebugAndroidTestResources-2 C:\Users\sofia\Downloads\app_gestion_itinerario\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
-com.gestion.itinerario.test.app-debugAndroidTest-3 C:\Users\sofia\Downloads\app_gestion_itinerario\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources

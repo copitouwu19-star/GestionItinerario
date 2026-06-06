@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -65,11 +66,6 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // Room
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -89,4 +85,22 @@ dependencies {
     // Charts
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation("com.google.firebase:firebase-storage-ktx")
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // QR code generation
+    implementation("com.google.zxing:core:3.5.3")
+
+    // Retrofit + Gson (conexión con API MySQL)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 }
