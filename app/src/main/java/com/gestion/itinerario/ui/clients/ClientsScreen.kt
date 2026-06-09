@@ -241,7 +241,7 @@ fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -
                     Text(
                         c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp),
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.weight(1f)
