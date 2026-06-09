@@ -46,6 +46,13 @@ class ClientViewModel @Inject constructor(
     fun getAppointmentsForClient(clientId: String): Flow<List<Appointment>> =
         appointmentRepo.getAll().map { list -> list.filter { it.clientId == clientId } }
 
-    fun getInvoicesForClient(clientId: String): Flow<List<Invoice>> =
-        invoiceRepo.getByClient(clientId)
+    fun getInvoicesForClient(client: Client): Flow<List<Invoice>> {
+        val fullName = "${client.name} ${client.lastName}".trim().lowercase()
+        return invoiceRepo.getAll().map { list ->
+            list.filter { inv ->
+                (inv.clientId.isNotBlank() && inv.clientId == client.id) ||
+                (inv.clientId.isBlank() && inv.clientName.lowercase() == fullName)
+            }
+        }
+    }
 }

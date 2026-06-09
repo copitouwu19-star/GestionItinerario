@@ -171,8 +171,8 @@ fun ClientsScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        itemsIndexed(clients, key = { _, c -> c.id }) { index, c ->
-                            ClientCard(c, accentIndex = index,
+                        itemsIndexed(clients, key = { _, c -> c.id }) { _, c ->
+                            ClientCard(c,
                                 onView   = { detailClient = c },
                                 onEdit   = { editClient = c; showDialog = true },
                                 onDelete = { confirmDeleteClient = c })
@@ -208,16 +208,14 @@ fun ClientsScreen(
 
 // ─── Tarjeta de cliente ───────────────────────────────────────────────────────
 @Composable
-fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
-    val accentColors = listOf(Primary40, Secondary40, Tertiary40)
     val isJuridica = c.clientType == "Persona Jurídica"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(16.dp),
         colors   = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick  = onView
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -233,20 +231,44 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
                         shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                     )
             )
-            // Cuerpo: info a la izquierda
+            // Cuerpo
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 14.dp, top = 12.dp, bottom = 10.dp, end = 10.dp)
             ) {
-                // Nombre
-                Text(
-                    c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
+                // Nombre + badges en fila horizontal (esquina superior derecha)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (c.phone.isNotBlank()) {
+                            ActionBadge(
+                                onClick = { openWhatsApp(context, c.phone) },
+                                containerColor = WhatsAppGreen.copy(alpha = 0.14f)
+                            ) {
+                                Icon(painter = painterResource(R.drawable.ic_whatsapp),
+                                    contentDescription = "WhatsApp", tint = WhatsAppGreen,
+                                    modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        ActionBadge(onClick = onEdit, containerColor = Color(0xFF2196F3).copy(alpha = 0.12f)) {
+                            Icon(Icons.Default.Edit, null, tint = Color(0xFF2196F3), modifier = Modifier.size(18.dp))
+                        }
+                        ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.12f)) {
+                            Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 // Chip tipo cliente
                 Surface(
@@ -294,30 +316,6 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
                     }
                 }
             }
-            // Badges de acción — columna vertical centrada (igual que referencia)
-            Column(
-                modifier = Modifier
-                    .padding(end = 10.dp)
-                    .align(Alignment.CenterVertically),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (c.phone.isNotBlank()) {
-                    ActionBadge(
-                        onClick = { openWhatsApp(context, c.phone) },
-                        containerColor = WhatsAppGreen.copy(alpha = 0.14f)
-                    ) {
-                        Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                            contentDescription = "WhatsApp", tint = WhatsAppGreen, modifier = Modifier.size(18.dp))
-                    }
-                }
-                ActionBadge(onClick = onEdit, containerColor = Color(0xFF2196F3).copy(alpha = 0.12f)) {
-                    Icon(Icons.Default.Edit, null, tint = Color(0xFF2196F3), modifier = Modifier.size(18.dp))
-                }
-                ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.12f)) {
-                    Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))
-                }
-            }
         }
     }
 }
@@ -359,9 +357,8 @@ fun ClientDetailScreen(
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
     val context        = LocalContext.current
-    val equipment      by viewModel.getEquipmentForClient(client.id).collectAsState(initial = emptyList())
     val services       by viewModel.getServicesForClient(client.id).collectAsState(initial = emptyList())
-    val invoices       by viewModel.getInvoicesForClient(client.id).collectAsState(initial = emptyList())
+    val invoices       by viewModel.getInvoicesForClient(client).collectAsState(initial = emptyList())
     val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
     val pdfScope = rememberCoroutineScope()
     var generatingInvoiceId by remember { mutableStateOf<String?>(null) }
@@ -382,7 +379,7 @@ fun ClientDetailScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "${services.size} SERVICIOS · ${equipment.size} EQUIPOS",
+                            "${services.size} SERVICIOS · ${invoices.size} FACTURAS",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -512,25 +509,14 @@ fun ClientDetailScreen(
                 }
             }
 
-            // ── Estadísticas: Servicios + Facturas ────────────────────────────
+            // ── Estadísticas: Servicios ────────────────────────────────────────
             item {
-                Row(
+                StatTileCard(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatTileCard(
-                        modifier = Modifier.weight(1f),
-                        count = services.size,
-                        label = "SERVICIOS",
-                        accentColor = Primary40
-                    )
-                    StatTileCard(
-                        modifier = Modifier.weight(1f),
-                        count = invoices.size,
-                        label = "FACTURAS",
-                        accentColor = Secondary40
-                    )
-                }
+                    count = services.size,
+                    label = "SERVICIOS",
+                    accentColor = Primary40
+                )
             }
 
             // ── Historial de Servicios ─────────────────────────────────────────
