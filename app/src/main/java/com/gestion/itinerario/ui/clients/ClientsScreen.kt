@@ -117,20 +117,36 @@ fun ClientsScreen(
                     )
                     .fillMaxSize()
             ) {
-                OutlinedTextField(
-                    value = search, onValueChange = viewModel::onSearch,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    placeholder = { Text("Buscar por nombre o teléfono…") },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    singleLine = true,
+                // Barra de búsqueda blanca con sombra
+                androidx.compose.material3.Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     shape = RoundedCornerShape(50),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    color = Color.White,
+                    shadowElevation = 4.dp
+                ) {
+                    OutlinedTextField(
+                        value = search, onValueChange = viewModel::onSearch,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text("Buscar por nombre o teléfono…",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(50),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent
+                        )
                     )
-                )
+                }
                 if (clients.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally,
@@ -148,7 +164,11 @@ fun ClientsScreen(
                     }
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(
+                            start = 16.dp, end = 16.dp,
+                            top = 4.dp,
+                            bottom = innerPadding.calculateBottomPadding() + 88.dp
+                        ),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         itemsIndexed(clients, key = { _, c -> c.id }) { index, c ->
@@ -191,100 +211,111 @@ fun ClientsScreen(
 fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
     val accentColors = listOf(Primary40, Secondary40, Tertiary40)
-    val accentColor = accentColors[accentIndex % accentColors.size]
+    val isJuridica = c.clientType == "Persona Jurídica"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(18.dp),
+        shape    = RoundedCornerShape(16.dp),
         colors   = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick  = onView
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // Borde izquierdo degradado (morado→rosa para Natural, al revés para Jurídica)
+            // Borde izquierdo degradado
             Box(
                 modifier = Modifier
                     .width(5.dp)
                     .fillMaxHeight()
                     .background(
                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            if (c.clientType == "Persona Jurídica")
-                                listOf(Secondary40, Primary40)
-                            else listOf(Primary40, Secondary40)
+                            if (isJuridica) listOf(Secondary40, Primary40) else listOf(Primary40, Secondary40)
                         ),
-                        shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp)
+                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                     )
             )
-            // Contenido principal
-            Row(
+            // Cuerpo: info a la izquierda
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 14.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
-                verticalAlignment = Alignment.Top
+                    .padding(start = 14.dp, top = 12.dp, bottom = 10.dp, end = 10.dp)
             ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Nombre
+                Text(
+                    c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(4.dp))
+                // Chip tipo cliente
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (isJuridica) Secondary80.copy(alpha = 0.15f) else Primary80.copy(alpha = 0.12f)
+                ) {
                     Text(
-                        c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        c.clientType,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isJuridica) Secondary40 else Primary40
                     )
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (c.clientType == "Persona Jurídica")
-                            Secondary80.copy(alpha = 0.15f)
-                        else Primary80.copy(alpha = 0.12f)
+                }
+                // Divisor sutil
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    thickness = 0.8.dp
+                )
+                // Teléfono
+                if (c.phone.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(bottom = 2.dp)
                     ) {
-                        Text(
-                            c.clientType,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (c.clientType == "Persona Jurídica") Secondary40 else Primary40
-                        )
-                    }
-                    if (c.phone.isNotBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Phone, null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(15.dp))
-                            Text(c.phone, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    if (c.address.isNotBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.LocationOn, null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(15.dp))
-                            Text(c.address, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                        }
+                        Icon(Icons.Default.Phone, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(13.dp))
+                        Text(c.phone, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                // ── Badges de acción (columna derecha) ──────────────────────
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(start = 6.dp)
-                ) {
-                    if (c.phone.isNotBlank()) {
-                        ActionBadge(onClick = { openWhatsApp(context, c.phone) },
-                            containerColor = WhatsAppGreen.copy(alpha = 0.15f)) {
-                            Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                                contentDescription = "WhatsApp", tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
-                        }
+                // Dirección
+                if (c.address.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.LocationOn, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(13.dp))
+                        Text(c.address, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
-                    ActionBadge(onClick = onEdit, containerColor = Color(0xFF2196F3).copy(alpha = 0.13f)) {
-                        Icon(Icons.Default.Edit, null, tint = Color(0xFF2196F3), modifier = Modifier.size(20.dp))
+                }
+            }
+            // Badges de acción — columna vertical centrada (igual que referencia)
+            Column(
+                modifier = Modifier
+                    .padding(end = 10.dp)
+                    .align(Alignment.CenterVertically),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (c.phone.isNotBlank()) {
+                    ActionBadge(
+                        onClick = { openWhatsApp(context, c.phone) },
+                        containerColor = WhatsAppGreen.copy(alpha = 0.14f)
+                    ) {
+                        Icon(painter = painterResource(R.drawable.ic_whatsapp),
+                            contentDescription = "WhatsApp", tint = WhatsAppGreen, modifier = Modifier.size(18.dp))
                     }
-                    ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.13f)) {
-                        Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(20.dp))
-                    }
+                }
+                ActionBadge(onClick = onEdit, containerColor = Color(0xFF2196F3).copy(alpha = 0.12f)) {
+                    Icon(Icons.Default.Edit, null, tint = Color(0xFF2196F3), modifier = Modifier.size(18.dp))
+                }
+                ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.12f)) {
+                    Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -297,7 +328,7 @@ private fun ActionBadge(onClick: () -> Unit, containerColor: Color, content: @Co
         onClick = onClick,
         shape = CircleShape,
         color = containerColor,
-        modifier = Modifier.size(40.dp)
+        modifier = Modifier.size(36.dp)
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             content()
