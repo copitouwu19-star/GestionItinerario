@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gestion.itinerario.data.entity.Appointment
+import com.gestion.itinerario.data.entity.AppointmentStatus
 import com.gestion.itinerario.data.entity.Client
 import com.gestion.itinerario.data.entity.Invoice
 import com.gestion.itinerario.data.entity.ServiceOrder
@@ -108,13 +110,7 @@ fun ClientsScreen(
         ) { scaffoldPadding ->
             Column(
                 modifier = Modifier
-                    .padding(
-                        top    = scaffoldPadding.calculateTopPadding(),
-                        bottom = maxOf(
-                            innerPadding.calculateBottomPadding(),
-                            scaffoldPadding.calculateBottomPadding()
-                        ) + 72.dp
-                    )
+                    .padding(top = scaffoldPadding.calculateTopPadding())
                     .fillMaxSize()
             ) {
                 // Barra de búsqueda blanca con sombra
@@ -245,7 +241,7 @@ fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -
                     Text(
                         c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.weight(1f)
@@ -358,6 +354,7 @@ fun ClientDetailScreen(
 ) {
     val context        = LocalContext.current
     val services       by viewModel.getServicesForClient(client.id).collectAsState(initial = emptyList())
+    val appointments   by viewModel.getAppointmentsForClient(client.id).collectAsState(initial = emptyList())
     val invoices       by viewModel.getInvoicesForClient(client).collectAsState(initial = emptyList())
     val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
     val pdfScope = rememberCoroutineScope()
@@ -379,7 +376,7 @@ fun ClientDetailScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "${services.size} SERVICIOS · ${invoices.size} FACTURAS",
+                            "${services.size} SERVICIOS · ${appointments.size} CITAS · ${invoices.size} FACTURAS",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -539,6 +536,29 @@ fun ClientDetailScreen(
             } else {
                 itemsIndexed(services, key = { _, s -> s.id }) { index, svc ->
                     ServiceHistoryCard(svc = svc, sdf = sdf, accentColor = accentColors[index % accentColors.size])
+                }
+            }
+
+            // ── Citas ─────────────────────────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Citas (${appointments.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            if (appointments.isEmpty()) {
+                item { EmptyState(icon = Icons.Default.CalendarToday, message = "Sin citas registradas") }
+            } else {
+                itemsIndexed(appointments, key = { _, a -> a.id }) { index, appt ->
+                    AppointmentHistoryCard(appt = appt, sdf = sdf, accentColor = accentColors[index % accentColors.size])
                 }
             }
 
@@ -723,6 +743,80 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentC
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ─── Tarjeta historial cita ───────────────────────────────────────────────────
+@Composable
+private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat, accentColor: Color = Tertiary40) {
+    val (statusColor, statusLabel) = when (appt.status) {
+        AppointmentStatus.SCHEDULED   -> StatusPending   to "PROGRAMADA"
+        AppointmentStatus.IN_PROGRESS -> StatusInRepair  to "EN PROCESO"
+        AppointmentStatus.COMPLETED   -> StatusCompleted to "COMPLETADA"
+        AppointmentStatus.CANCELLED   -> StatusLowStock  to "CANCELADA"
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor, RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+            )
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.CalendarToday, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp))
+                    Text(
+                        sdf.format(Date(appt.dateTime)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = statusColor.copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            statusLabel,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
+                    }
+                }
+                Text(
+                    "Tipo: ${when (appt.serviceType) {
+                        ServiceType.MAINTENANCE  -> "Mantenimiento"
+                        ServiceType.REPAIR       -> "Reparación"
+                        ServiceType.INSTALLATION -> "Instalación"
+                    }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (appt.equipmentType.isNotBlank())
+                    Text("Equipo: ${appt.equipmentType}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (appt.notes.isNotBlank())
+                    Text(appt.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -136,7 +136,7 @@ private fun GradientBottomNavBar(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 20.dp),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 6.dp,
@@ -145,7 +145,7 @@ private fun GradientBottomNavBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 10.dp),
+                .padding(horizontal = 6.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
