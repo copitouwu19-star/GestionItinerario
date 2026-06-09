@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,7 +36,10 @@ import com.gestion.itinerario.data.entity.ServiceStatus
 import com.gestion.itinerario.data.entity.ServiceType
 import com.gestion.itinerario.ui.theme.Primary40
 import com.gestion.itinerario.ui.theme.Primary80
+import com.gestion.itinerario.ui.theme.Secondary40
 import com.gestion.itinerario.ui.theme.Secondary80
+import kotlinx.coroutines.launch
+import com.gestion.itinerario.ui.theme.Tertiary40
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import com.gestion.itinerario.ui.theme.StatusInRepair
 import com.gestion.itinerario.ui.theme.StatusLowStock
@@ -117,8 +121,15 @@ fun ClientsScreen(
                     value = search, onValueChange = viewModel::onSearch,
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     placeholder = { Text("Buscar por nombre o teléfono…") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    singleLine = true, shape = RoundedCornerShape(12.dp)
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(50),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 )
                 if (clients.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -140,8 +151,8 @@ fun ClientsScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(clients, key = { it.id }) { c ->
-                            ClientCard(c,
+                        itemsIndexed(clients, key = { _, c -> c.id }) { index, c ->
+                            ClientCard(c, accentIndex = index,
                                 onView   = { detailClient = c },
                                 onEdit   = { editClient = c; showDialog = true },
                                 onDelete = { confirmDeleteClient = c })
@@ -180,81 +191,136 @@ fun ClientsScreen(
 }
 
 @Composable
-fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
+    val accentColors = listOf(Primary40, Secondary40, Tertiary40)
+    val accentColor = accentColors[accentIndex % accentColors.size]
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(12.dp),
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape    = RoundedCornerShape(18.dp),
+        colors   = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         onClick  = onView
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Primary80.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(c.name.take(1).uppercase(), color = Primary80, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
-                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                Surface(
-                    shape  = RoundedCornerShape(6.dp),
-                    color  = if (c.clientType == "Persona Jurídica")
-                        Secondary80.copy(alpha = 0.15f)
-                    else Primary80.copy(alpha = 0.12f)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier
+                .width(5.dp)
+                .fillMaxHeight()
+                .background(accentColor, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)))
+            Box(modifier = Modifier.weight(1f)) {
+                Row(modifier = Modifier.padding(16.dp).padding(end = 116.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Primary80.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(c.name.take(1).uppercase(), color = Primary80, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
+                            fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Surface(
+                            shape  = RoundedCornerShape(6.dp),
+                            color  = if (c.clientType == "Persona Jurídica")
+                                Secondary80.copy(alpha = 0.15f)
+                            else Primary80.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                c.clientType,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style    = MaterialTheme.typography.labelSmall,
+                                color    = if (c.clientType == "Persona Jurídica") Secondary80 else Primary80
+                            )
+                        }
+                        if (c.phone.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Phone, null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp))
+                                Text(c.phone, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (c.phone.isNotBlank() && c.address.isNotBlank()) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                        if (c.address.isNotBlank()) Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.LocationOn, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp))
+                            Text(c.address, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    }
+                }
+                // ── Badges de acción (esquina superior derecha) ───────────────
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        c.clientType,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = if (c.clientType == "Persona Jurídica") Secondary80 else Primary80
-                    )
-                }
-                if (c.phone.isNotBlank()) Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(Icons.Default.Phone, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp))
-                    Text(c.phone, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (c.address.isNotBlank()) Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(Icons.Default.LocationOn, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp))
-                    Text(c.address, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    if (c.phone.isNotBlank()) {
+                        ActionBadge(onClick = { openWhatsApp(context, c.phone) }, containerColor = WhatsAppGreen.copy(alpha = 0.15f)) {
+                            Icon(painter = painterResource(R.drawable.ic_whatsapp),
+                                contentDescription = "WhatsApp", tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    ActionBadge(onClick = onEdit, containerColor = Primary80.copy(alpha = 0.15f)) {
+                        Icon(Icons.Default.Edit, null, tint = Primary80, modifier = Modifier.size(20.dp))
+                    }
+                    ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.15f)) {
+                        Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
-            if (c.phone.isNotBlank()) {
-                IconButton(onClick = { openWhatsApp(context, c.phone) }) {
-                    Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                        contentDescription = "WhatsApp", tint = WhatsAppGreen)
-                }
-            }
-            IconButton(onClick = onEdit)   { Icon(Icons.Default.Edit, null, tint = Primary80) }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, null, tint = StatusLowStock) }
+        }
+    }
+}
+
+/** Badge circular pequeño usado para acciones rápidas (WhatsApp/Editar/Eliminar) en la esquina de una tarjeta. */
+@Composable
+private fun ActionBadge(onClick: () -> Unit, containerColor: Color, content: @Composable () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = containerColor,
+        modifier = Modifier.size(40.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            content()
         }
     }
 }
 
 @Composable
-fun ClientDetailScreen(client: Client, viewModel: ClientViewModel, onBack: () -> Unit) {
+fun ClientDetailScreen(
+    client: Client,
+    viewModel: ClientViewModel,
+    onBack: () -> Unit,
+    invoiceViewModel: com.gestion.itinerario.ui.invoice.InvoiceViewModel = hiltViewModel(),
+    profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
+) {
     val context      = LocalContext.current
     val equipment    by viewModel.getEquipmentForClient(client.id).collectAsState(initial = emptyList())
     val services     by viewModel.getServicesForClient(client.id).collectAsState(initial = emptyList())
     val appointments by viewModel.getAppointmentsForClient(client.id).collectAsState(initial = emptyList())
     val invoices     by viewModel.getInvoicesForClient(client.id).collectAsState(initial = emptyList())
+    val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
+    val pdfScope = rememberCoroutineScope()
+    var generatingInvoiceId by remember { mutableStateOf<String?>(null) }
 
     var showWhatsAppMenu by remember { mutableStateOf(false) }
 
@@ -340,8 +406,8 @@ fun ClientDetailScreen(client: Client, viewModel: ClientViewModel, onBack: () ->
         ) {
             // ── Info básica ────────────────────────────────────────────────────
             item {
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Información del Cliente", fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium)
@@ -390,7 +456,7 @@ fun ClientDetailScreen(client: Client, viewModel: ClientViewModel, onBack: () ->
                             Icon(Icons.Default.Warning, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))
                             Text(fault, modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.bodyMedium)
-                            Surface(shape = RoundedCornerShape(12.dp),
+                            Surface(shape = RoundedCornerShape(18.dp),
                                 color = StatusLowStock.copy(alpha = 0.2f)) {
                                 Text("×$count", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                     style = MaterialTheme.typography.labelSmall, color = StatusLowStock,
@@ -465,7 +531,26 @@ fun ClientDetailScreen(client: Client, viewModel: ClientViewModel, onBack: () ->
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            items(invoices) { inv -> InvoiceHistoryCard(inv, sdf) }
+            items(invoices) { inv ->
+                InvoiceHistoryCard(
+                    inv = inv,
+                    sdf = sdf,
+                    isLoadingPdf = generatingInvoiceId == inv.id,
+                    onViewPdf = {
+                        generatingInvoiceId = inv.id
+                        pdfScope.launch {
+                            try {
+                                val file = invoiceViewModel.generatePdf(context, inv, companyProfile)
+                                com.gestion.itinerario.ui.invoice.InvoicePdfGenerator.openPdf(context, file)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                android.widget.Toast.makeText(context, "No se pudo generar el PDF. Intenta de nuevo.", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                            generatingInvoiceId = null
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -478,7 +563,7 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
         ServiceStatus.COMPLETED   -> StatusCompleted  to "Completado"
     }
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -515,6 +600,25 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
                 Text("Completado: ${sdf.format(Date(it))}", style = MaterialTheme.typography.labelSmall,
                     color = StatusCompleted)
             }
+            svc.warrantyExpiresAt?.let { expiresAt ->
+                val vigente = expiresAt > System.currentTimeMillis()
+                Surface(shape = RoundedCornerShape(6.dp),
+                    color = (if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.15f)) {
+                    Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.VerifiedUser, null,
+                            tint = if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(12.dp))
+                        Text(
+                            if (vigente) "En garantía hasta ${sdf.format(Date(expiresAt))}"
+                            else "Garantía vencida (${sdf.format(Date(expiresAt))})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -528,7 +632,7 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat) {
         AppointmentStatus.CANCELLED   -> Color(0xFFB71C1C) to "Cancelada"
     }
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -556,14 +660,14 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat) {
 }
 
 @Composable
-private fun InvoiceHistoryCard(inv: Invoice, sdf: SimpleDateFormat) {
+private fun InvoiceHistoryCard(inv: Invoice, sdf: SimpleDateFormat, isLoadingPdf: Boolean, onViewPdf: () -> Unit) {
     val (pColor, pLabel) = when (inv.paymentStatus) {
         com.gestion.itinerario.data.entity.PaymentStatus.PAID    -> StatusCompleted to "Pagado"
         com.gestion.itinerario.data.entity.PaymentStatus.PENDING -> Color(0xFFE65100) to "Pendiente"
         else -> MaterialTheme.colorScheme.onSurfaceVariant to "Sin estado"
     }
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -582,6 +686,22 @@ private fun InvoiceHistoryCard(inv: Invoice, sdf: SimpleDateFormat) {
             if (inv.equipmentType.isNotBlank())
                 Text("Equipo: ${inv.equipmentType}", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(2.dp))
+            OutlinedButton(
+                onClick = onViewPdf,
+                enabled = !isLoadingPdf,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                if (isLoadingPdf) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Generando…", style = MaterialTheme.typography.labelSmall)
+                } else {
+                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(16.dp), tint = Primary80)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ver PDF", style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
     }
 }

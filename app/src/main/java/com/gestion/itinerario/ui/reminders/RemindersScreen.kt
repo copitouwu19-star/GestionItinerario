@@ -99,7 +99,7 @@ fun ReminderCard(r: MaintenanceReminder, onMarkDone: () -> Unit, onDelete: () ->
         IntervalUnit.MONTHS -> "Cada ${r.intervalValue} mes(es)"
     }
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 isDue -> StatusLowStock.copy(0.08f)

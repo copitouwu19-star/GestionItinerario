@@ -1,6 +1,8 @@
 package com.gestion.itinerario.di
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.firestoreSettings
+import com.google.firebase.firestore.persistentCacheSettings
 import com.google.firebase.storage.FirebaseStorage
 import dagger.Module
 import dagger.Provides
@@ -14,7 +16,13 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
+    fun provideFirestore(): FirebaseFirestore {
+        val firestore = FirebaseFirestore.getInstance()
+        firestore.firestoreSettings = firestoreSettings {
+            setLocalCacheSettings(persistentCacheSettings {})
+        }
+        return firestore
+    }
 
     @Provides
     @Singleton

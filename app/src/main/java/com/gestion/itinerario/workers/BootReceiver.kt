@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.gestion.itinerario.data.entity.AppointmentStatus
@@ -85,15 +84,8 @@ class BootReceiver : BroadcastReceiver() {
             context, rc, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val canExact = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> am.canScheduleExactAlarms()
-            else -> true
-        }
-        if (canExact) {
-            try { am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi) }
-            catch (e: SecurityException) { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi) }
-        } else {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-        }
+        // setAlarmClock dispara exactamente en triggerAt, exento de Doze/App Standby
+        // (setExactAndAllowWhileIdle puede diferirse ~30-50 min en el primer mantenimiento de Doze)
+        am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, null), pi)
     }
 }

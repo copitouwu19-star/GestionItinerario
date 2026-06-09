@@ -64,7 +64,12 @@ object InvoicePdfGenerator {
         titlePaint.textSize = 18f
         canvas.drawText(profile.companyName.ifBlank { "Mi Empresa" }, marginL, 35f, titlePaint)
         normalPaint.color = Color.WHITE; normalPaint.textSize = 10f
-        if (profile.phone.isNotBlank()) canvas.drawText("Tel: ${profile.phone}", marginL, 52f, normalPaint)
+        val taxIdToShow = invoice.companyTaxId.ifBlank { profile.taxId }
+        val line2 = buildString {
+            if (taxIdToShow.isNotBlank()) append("NIT: $taxIdToShow")
+            if (profile.phone.isNotBlank()) { if (isNotEmpty()) append("  ·  "); append("Tel: ${profile.phone}") }
+        }
+        if (line2.isNotBlank()) canvas.drawText(line2, marginL, 52f, normalPaint)
         if (profile.address.isNotBlank()) canvas.drawText(profile.address.take(50), marginL, 66f, normalPaint)
 
         // Número de factura — se ubica a la izquierda del logo si hay logo, o al borde derecho
@@ -110,21 +115,32 @@ object InvoicePdfGenerator {
         canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = Color.rgb(21, 101, 192); strokeWidth = 2f })
         y += 4f
 
+        // Columnas: Descripción | Cant | Unidad | Vlr. Unitario | Vlr. Total
+        val colQtyX  = marginR - 290f
+        val colUnitX = marginR - 230f
+        val colUPX   = marginR - 165f
+        val colTotX  = marginR - 75f
+
         // Header tabla
         canvas.drawRect(marginL, y, marginR, y + 24f, Paint().apply { color = Color.rgb(21, 101, 192) })
-        headerPaint.textSize = 11f
+        headerPaint.textSize = 10f
         canvas.drawText("DESCRIPCIÓN", marginL + 8f, y + 16f, headerPaint)
-        canvas.drawText("VALOR (USD)", marginR - 100f, y + 16f, headerPaint)
+        canvas.drawText("CANT.", colQtyX, y + 16f, headerPaint)
+        canvas.drawText("UNIDAD", colUnitX, y + 16f, headerPaint)
+        canvas.drawText("VLR. UNIT.", colUPX, y + 16f, headerPaint)
+        canvas.drawText("VLR. TOTAL", colTotX, y + 16f, headerPaint)
         y += 28f
 
         invoice.items.forEachIndexed { i, item ->
             val bg = if (i % 2 == 0) Color.rgb(240, 248, 255) else Color.WHITE
             canvas.drawRect(marginL, y - 4f, marginR, y + 16f, Paint().apply { color = bg })
             normalPaint.color = Color.BLACK; normalPaint.textSize = 10f
-            canvas.drawText(item.description.take(60), marginL + 8f, y + 10f, normalPaint)
+            canvas.drawText(item.description.take(38), marginL + 8f, y + 10f, normalPaint)
+            canvas.drawText(String.format("%.0f", item.quantity), colQtyX, y + 10f, normalPaint)
+            canvas.drawText(item.unit.take(12), colUnitX, y + 10f, normalPaint)
+            canvas.drawText(String.format("%.2f", item.unitPrice), colUPX, y + 10f, normalPaint)
             val amtStr = "$${String.format("%.2f", item.amount)}"
-            val amtW = normalPaint.measureText(amtStr)
-            canvas.drawText(amtStr, marginR - amtW - 8f, y + 10f, normalPaint)
+            canvas.drawText(amtStr, colTotX, y + 10f, normalPaint)
             y += 20f
         }
         if (invoice.diagnosis.isNotBlank()) {
@@ -135,23 +151,42 @@ object InvoicePdfGenerator {
         canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = Color.LTGRAY; strokeWidth = 1f })
         y += 12f
 
-        // ── Total ─────────────────────────────────────────────────────────────
-        boldPaint.color = Color.BLACK; boldPaint.textSize = 14f
-        val totalStr = "TOTAL: \$${String.format("%.2f", invoice.totalAmount)}"
-        val totalW = boldPaint.measureText(totalStr)
-        canvas.drawText(totalStr, marginR - totalW, y, boldPaint)
-        y += 20f
+        // ── Caja de totales (Subtotal / Impuesto / Total a pagar) ─────────────
+        val subtotal = invoice.items.sumOf { it.amount }
+        val taxAmount = invoice.totalAmount - subtotal
+        val boxW = 220f
+        val boxL = marginR - boxW
+        var boxY = y
+        normalPaint.color = Color.DKGRAY; normalPaint.textSize = 10f
+        canvas.drawText("Subtotal", boxL + 8f, boxY + 12f, normalPaint)
+        val subtotalStr = "$${String.format("%.2f", subtotal)}"
+        canvas.drawText(subtotalStr, marginR - normalPaint.measureText(subtotalStr) - 8f, boxY + 12f, normalPaint)
+        boxY += 18f
+        if (invoice.taxRate > 0.0) {
+            canvas.drawText("Impuesto (${String.format("%.1f", invoice.taxRate)}%)", boxL + 8f, boxY + 12f, normalPaint)
+            val taxStr = "$${String.format("%.2f", taxAmount)}"
+            canvas.drawText(taxStr, marginR - normalPaint.measureText(taxStr) - 8f, boxY + 12f, normalPaint)
+            boxY += 18f
+        }
+        canvas.drawRect(boxL, boxY, marginR, boxY + 26f, Paint().apply { color = Color.rgb(21, 101, 192) })
+        headerPaint.textSize = 12f
+        canvas.drawText("TOTAL A PAGAR", boxL + 8f, boxY + 17f, headerPaint)
+        val totalStr = "$${String.format("%.2f", invoice.totalAmount)}"
+        canvas.drawText(totalStr, marginR - headerPaint.measureText(totalStr) - 8f, boxY + 17f, headerPaint)
+        y = boxY + 26f + 16f
 
-        // Método y estado pago
+        // ── Condición de pago / método / estado ───────────────────────────────
+        canvas.drawRect(marginL, y, marginR, y + 56f, Paint().apply { color = Color.rgb(245, 247, 250) })
+        normalPaint.color = Color.rgb(21, 101, 192); normalPaint.textSize = 10f
+        canvas.drawText("CONDICIÓN DE PAGO: ${invoice.paymentTerms.ifBlank { "Contado" }}", marginL + 8f, y + 18f, boldPaint.apply { textSize = 10f; color = Color.rgb(21,101,192) })
         normalPaint.color = Color.DKGRAY; normalPaint.textSize = 10f
         val methodStr = "Método de pago: ${when(invoice.paymentMethod) { PaymentMethod.CASH -> "Efectivo"; PaymentMethod.TRANSFER -> "Transferencia"; else -> "No especificado" }}"
-        canvas.drawText(methodStr, marginR - normalPaint.measureText(methodStr), y, normalPaint)
-        y += 14f
+        canvas.drawText(methodStr, marginL + 8f, y + 36f, normalPaint)
         val statusColor = when(invoice.paymentStatus) { PaymentStatus.PAID -> Color.rgb(46, 125, 50); PaymentStatus.PENDING -> Color.rgb(230, 81, 0); else -> Color.GRAY }
         normalPaint.color = statusColor
         val statusStr = "Estado: ${when(invoice.paymentStatus) { PaymentStatus.PAID -> "PAGADO"; PaymentStatus.PENDING -> "PENDIENTE"; else -> "Sin especificar" }}"
-        canvas.drawText(statusStr, marginR - normalPaint.measureText(statusStr), y, normalPaint)
-        y += 24f
+        canvas.drawText(statusStr, marginL + 8f, y + 50f, normalPaint)
+        y += 56f + 16f
 
         // ── Firma del cliente ─────────────────────────────────────────────────
         if (invoice.clientSignature.isNotBlank()) {
@@ -214,22 +249,36 @@ object InvoicePdfGenerator {
         return bmp
     }
 
+    /** Abre el PDF generado con la app visor de PDF predeterminada del teléfono. */
+    fun openPdf(context: Context, file: File) {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(context, "No se encontró una app para abrir el PDF. Se guardó en: ${file.absolutePath}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     fun shareViaWhatsApp(context: Context, file: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
+        val whatsappIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             setPackage("com.whatsapp")
         }
         try {
-            context.startActivity(Intent.createChooser(intent, "Compartir factura"))
+            context.startActivity(whatsappIntent)
         } catch (_: Exception) {
             context.startActivity(Intent.createChooser(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "application/pdf"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }, "Compartir factura"
             ))
         }

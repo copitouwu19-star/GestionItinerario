@@ -1,5 +1,7 @@
 package com.gestion.itinerario.ui.services
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,10 +16,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,15 +40,23 @@ import java.util.*
 fun ServicesScreen(
     innerPadding: PaddingValues = PaddingValues(),
     viewModel: ServiceViewModel = hiltViewModel(),
-    agendaViewModel: com.gestion.itinerario.ui.agenda.AgendaViewModel = hiltViewModel()
+    agendaViewModel: com.gestion.itinerario.ui.agenda.AgendaViewModel = hiltViewModel(),
+    profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
     val orders                by viewModel.orders.collectAsStateWithLifecycle()
     val allAppointments by viewModel.allAppointments.collectAsStateWithLifecycle()
+    val clients by viewModel.clientRepo.getAll().collectAsStateWithLifecycle(emptyList())
+    val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
+    val clientMap = remember(clients) { clients.associateBy { it.id } }
+    fun clientFullName(id: String) = clientMap[id]?.let { "${it.name} ${it.lastName}".trim() } ?: "Cliente"
+    val professionalName = companyProfile.ownerName.ifBlank { companyProfile.companyName }.ifBlank { "Profesional asignado" }
+    var detailAppointment by remember { mutableStateOf<Appointment?>(null) }
     var showDialog   by remember { mutableStateOf(false) }
     var editOrder    by remember { mutableStateOf<ServiceOrder?>(null) }
     var showAppointmentDialog by remember { mutableStateOf(false) }
     var editAppointment by remember { mutableStateOf<Appointment?>(null) }
     var filterStatus by remember { mutableStateOf<ServiceStatus?>(null) }
+    var showQuotes by remember { mutableStateOf(false) }
 
     // Diálogo de "Programar próximo mantenimiento" al completar cita
     var completedAppointment by remember { mutableStateOf<Appointment?>(null) }
@@ -95,7 +108,16 @@ fun ServicesScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Órdenes de Servicio", fontWeight = FontWeight.Bold) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Órdenes de Servicio", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { showQuotes = true }) {
+                        Icon(Icons.Default.RequestQuote, contentDescription = "Cotizaciones")
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { editOrder = null; showDialog = true }, containerColor = Primary40) {
                 Icon(Icons.Default.Add, null, tint = Color.White)
@@ -178,6 +200,7 @@ fun ServicesScreen(
                         items(filteredAppointments, key = { "appt_${it.id}" }) { appt ->
                             ScheduledAppointmentCard(
                                 appointment = appt,
+                                onViewDetails = { detailAppointment = appt },
                                 onEdit      = { editAppointment = appt; showAppointmentDialog = true },
                                 onStart     = { viewModel.startAppointment(appt) },
                                 onComplete  = {
@@ -200,6 +223,7 @@ fun ServicesScreen(
     if (showDialog) {
         ServiceOrderFormDialog(
             initial   = editOrder,
+            existingOrders = orders,
             onDismiss = { showDialog = false },
             onSave    = { o ->
                 if (editOrder == null) viewModel.save(o) else viewModel.update(o.copy(id = editOrder!!.id))
@@ -298,6 +322,22 @@ fun ServicesScreen(
                 )
                 completedAppointment = null
             }
+        )
+    }
+
+    // ── Diálogo de cotizaciones previas ───────────────────────────────────────
+    if (showQuotes) {
+        com.gestion.itinerario.ui.quotes.QuotesDialog(onDismiss = { showQuotes = false })
+    }
+
+    // ── Pantalla de Detalle del Servicio (desde Citas Programadas) ────────────
+    detailAppointment?.let { appt ->
+        ServiceDetailScreen(
+            appointment = appt,
+            clientName = clientFullName(appt.clientId),
+            professionalName = professionalName,
+            clientPhone = clientMap[appt.clientId]?.phone ?: "",
+            onDismiss = { detailAppointment = null }
         )
     }
 }
@@ -406,6 +446,7 @@ fun SectionHeader(
 @Composable
 fun ScheduledAppointmentCard(
     appointment: Appointment,
+    onViewDetails: () -> Unit = {},
     onEdit: () -> Unit,
     onStart: () -> Unit,
     onComplete: () -> Unit,
@@ -423,8 +464,8 @@ fun ScheduledAppointmentCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(12.dp),
-        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape    = RoundedCornerShape(18.dp),
+        colors   = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             // Cabecera
@@ -513,6 +554,15 @@ fun ScheduledAppointmentCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                TextButton(
+                    onClick = onViewDetails,
+                    modifier = Modifier.height(30.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("Ver detalles", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(14.dp))
+                }
                 if (appointment.status != AppointmentStatus.COMPLETED && appointment.status != AppointmentStatus.CANCELLED) {
                     IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
                         Icon(Icons.Default.Edit, null, tint = Primary80, modifier = Modifier.size(16.dp))
@@ -554,8 +604,8 @@ fun ServiceOrderCard(
 ) {
     val statusColor = order.status.color()
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Build, null, tint = Primary80, modifier = Modifier.size(20.dp))
@@ -657,8 +707,14 @@ fun ServiceOrderCard(
 }
 
 // ─── Formulario de orden de servicio (Dialog full-scroll) ────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServiceOrderFormDialog(initial: ServiceOrder?, onDismiss: () -> Unit, onSave: (ServiceOrder) -> Unit) {
+fun ServiceOrderFormDialog(
+    initial: ServiceOrder?,
+    existingOrders: List<ServiceOrder> = emptyList(),
+    onDismiss: () -> Unit,
+    onSave: (ServiceOrder) -> Unit
+) {
     var desc          by remember { mutableStateOf(initial?.description ?: "") }
     var diagnosis     by remember { mutableStateOf(initial?.diagnosis ?: "") }
     var type          by remember { mutableStateOf(initial?.type ?: ServiceType.MAINTENANCE) }
@@ -668,194 +724,446 @@ fun ServiceOrderFormDialog(initial: ServiceOrder?, onDismiss: () -> Unit, onSave
     var totalCostStr  by remember { mutableStateOf(if ((initial?.totalCost ?: 0.0) > 0.0) initial!!.totalCost.toString() else "") }
     var paymentMethod by remember { mutableStateOf(initial?.paymentMethod ?: PaymentMethod.NONE) }
     var paymentStatus by remember { mutableStateOf(initial?.paymentStatus ?: PaymentStatus.NONE) }
+    var warrantyMonths by remember { mutableStateOf(initial?.warrantyMonths ?: 0) }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // ── Título ────────────────────────────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        if (initial == null) "Nueva Orden de Servicio" else "Editar Orden",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                HorizontalDivider()
+    val serviceTypes  = listOf(ServiceType.MAINTENANCE, ServiceType.REPAIR, ServiceType.INSTALLATION)
+    val serviceIcons  = mapOf(
+        ServiceType.MAINTENANCE  to Icons.Default.Build,
+        ServiceType.REPAIR       to Icons.Default.Settings,
+        ServiceType.INSTALLATION to Icons.Default.HomeRepairService
+    )
+    val serviceLabels = mapOf(
+        ServiceType.MAINTENANCE  to "Mant.",
+        ServiceType.REPAIR       to "Reparación",
+        ServiceType.INSTALLATION to "Instalación"
+    )
+    val equipmentIcons = mapOf(
+        "Nevera"             to Icons.Default.AcUnit,
+        "Aire Acondicionado" to Icons.Default.Air,
+        "Lavadora"           to Icons.Default.WaterDrop,
+        "Otro"               to Icons.Default.MoreHoriz
+    )
 
-                // ── Contenido scrolleable ─────────────────────────────────────
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tipo de servicio
-                    Text("Tipo de servicio", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ServiceType.values().forEach { t ->
-                            FilterChip(selected = type == t, onClick = { type = t },
-                                label = { Text(t.displayName(), style = MaterialTheme.typography.labelSmall) })
-                        }
-                    }
-
-                    // Tipo de equipo
-                    Text("Tipo de equipo", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                        EQUIPMENT_TYPES.take(2).forEach { et ->
-                            FilterChip(selected = equipmentType == et,
-                                onClick = { equipmentType = if (equipmentType == et) "" else et },
-                                modifier = Modifier.weight(1f),
-                                label = { Text(et, style = MaterialTheme.typography.labelSmall) })
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                        EQUIPMENT_TYPES.drop(2).forEach { et ->
-                            FilterChip(selected = equipmentType == et,
-                                onClick = { equipmentType = if (equipmentType == et) "" else et },
-                                modifier = Modifier.weight(1f),
-                                label = { Text(et, style = MaterialTheme.typography.labelSmall) })
-                        }
-                    }
-
-                    OutlinedTextField(value = desc, onValueChange = {
-                            desc = it
-                            FaultClassifier.classify(it)?.let { sug -> type = sug.suggestedType }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            Scaffold(
+                containerColor = Color.White,
+                topBar = {
+                    TopAppBar(
+                        title = { Text(if (initial == null) "Nueva Orden de Servicio" else "Editar Orden",
+                            fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onDismiss) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Cancelar")
+                            }
                         },
-                        label = { Text("Descripción del problema *") },
-                        leadingIcon = { Icon(Icons.Default.Description, null) },
-                        modifier = Modifier.fillMaxWidth(), minLines = 2)
-
-                    // Sugerencia automática
-                    val suggestion = remember(desc) { FaultClassifier.classify(desc) }
-                    if (suggestion != null) {
-                        Surface(shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(0.6f)) {
-                            Row(modifier = Modifier.padding(10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Lightbulb, null,
-                                    tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
-                                Column {
-                                    Text("Causa probable:", style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold)
-                                    Text(suggestion.possibleCause, style = MaterialTheme.typography.bodySmall)
-                                    TextButton(onClick = { diagnosis = suggestion.possibleCause },
-                                        contentPadding = PaddingValues(0.dp),
-                                        modifier = Modifier.height(24.dp)) {
-                                        Text("Usar como diagnóstico →", style = MaterialTheme.typography.labelSmall)
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                    )
+                },
+                bottomBar = {
+                    Surface(shadowElevation = 8.dp, color = Color.White) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onDismiss,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(50)
+                            ) { Text("Cancelar") }
+                            Button(
+                                onClick = {
+                                    onSave(ServiceOrder(
+                                        id = initial?.id ?: "",
+                                        clientId = clientId,
+                                        equipmentId = equipId,
+                                        type = type,
+                                        description = desc,
+                                        diagnosis = diagnosis,
+                                        equipmentType = equipmentType,
+                                        totalCost = totalCostStr.toDoubleOrNull() ?: 0.0,
+                                        paymentMethod = paymentMethod,
+                                        paymentStatus = paymentStatus,
+                                        status = initial?.status ?: ServiceStatus.PENDING,
+                                        createdAt = initial?.createdAt ?: System.currentTimeMillis(),
+                                        completedAt = initial?.completedAt,
+                                        warrantyMonths = warrantyMonths,
+                                        warrantyExpiresAt = initial?.warrantyExpiresAt
+                                    ))
+                                },
+                                enabled = desc.isNotBlank(),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            Brush.linearGradient(listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.secondary
+                                            )),
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, null,
+                                            tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Text("Guardar", color = Color.White, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                             }
                         }
                     }
-                    OutlinedTextField(value = diagnosis, onValueChange = { diagnosis = it },
-                        label = { Text("Diagnóstico") },
-                        leadingIcon = { Icon(Icons.Default.Engineering, null) },
-                        modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = clientId, onValueChange = { clientId = it },
-                        label = { Text("ID Cliente") },
-                        leadingIcon = { Icon(Icons.Default.Person, null) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    OutlinedTextField(value = equipId, onValueChange = { equipId = it },
-                        label = { Text("ID Equipo") },
-                        leadingIcon = { Icon(Icons.Default.Build, null) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true)
-
-                    // ── Sección Pago ──────────────────────────────────────────
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.AttachMoney, null,
-                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Text("Pago", style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold)
-                    }
-
-                    OutlinedTextField(
-                        value = totalCostStr,
-                        onValueChange = { v -> if (v.all { it.isDigit() || it == '.' }) totalCostStr = v },
-                        label = { Text("Monto (USD)") },
-                        leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        placeholder = { Text("0.00") }
-                    )
-
-                    Text("Método de pago", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(PaymentMethod.NONE to "Sin especificar",
-                               PaymentMethod.CASH to "Efectivo",
-                               PaymentMethod.TRANSFER to "Transferencia").forEach { (m, label) ->
-                            FilterChip(selected = paymentMethod == m, onClick = { paymentMethod = m },
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) })
-                        }
-                    }
-
-                    Text("Estado del pago", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(PaymentStatus.NONE to "Sin especificar",
-                               PaymentStatus.PENDING to "Pendiente",
-                               PaymentStatus.PAID to "Pagado").forEach { (s, label) ->
-                            FilterChip(selected = paymentStatus == s, onClick = { paymentStatus = s },
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) })
-                        }
-                    }
                 }
-
-                // ── Botones ───────────────────────────────────────────────────
-                HorizontalDivider()
-                Row(
+            ) { padding ->
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
+                        .fillMaxSize()
+                        .padding(padding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancelar") }
-                    Button(
-                        onClick = {
-                            onSave(ServiceOrder(
-                                id = initial?.id ?: "",
-                                clientId = clientId,
-                                equipmentId = equipId,
-                                type = type,
-                                description = desc,
-                                diagnosis = diagnosis,
-                                equipmentType = equipmentType,
-                                totalCost = totalCostStr.toDoubleOrNull() ?: 0.0,
-                                paymentMethod = paymentMethod,
-                                paymentStatus = paymentStatus,
-                                status = initial?.status ?: ServiceStatus.PENDING,
-                                createdAt = initial?.createdAt ?: System.currentTimeMillis(),
-                                completedAt = initial?.completedAt
-                            ))
-                        },
-                        enabled = desc.isNotBlank()
-                    ) { Text("Guardar") }
+                    // ── Banner ────────────────────────────────────────────
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                            Box(modifier = Modifier.width(4.dp).fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary))
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(44.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Engineering, null,
+                                        tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
+                                Column {
+                                    Text(if (initial == null) "Registrar Servicio" else "Editar Servicio",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold)
+                                    Text("Ingrese los datos del trabajo a realizar.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Motivo ────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("TIPO DE SERVICIO", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()) {
+                            serviceTypes.forEach { st ->
+                                val selected = type == st
+                                Surface(
+                                    onClick = { type = st },
+                                    shape = RoundedCornerShape(50),
+                                    color = if (selected) MaterialTheme.colorScheme.primary else Color.White,
+                                    shadowElevation = if (selected) 0.dp else 2.dp,
+                                    border = if (selected) null else
+                                        androidx.compose.foundation.BorderStroke(
+                                            1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(serviceIcons[st]!!, null,
+                                            tint = if (selected) Color.White else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp))
+                                        Text(serviceLabels[st]!!,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Tipo de Equipo ────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("TIPO DE EQUIPO", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            EQUIPMENT_TYPES.chunked(2).forEach { row ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    row.forEach { et ->
+                                        val selected = equipmentType == et
+                                        Surface(
+                                            onClick = { equipmentType = if (equipmentType == et) "" else et },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(16.dp),
+                                            color = if (selected)
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                            else Color.White,
+                                            shadowElevation = if (selected) 0.dp else 2.dp,
+                                            border = if (selected)
+                                                androidx.compose.foundation.BorderStroke(
+                                                    1.5.dp, MaterialTheme.colorScheme.primary)
+                                            else
+                                                androidx.compose.foundation.BorderStroke(
+                                                    1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.size(32.dp)
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(
+                                                            MaterialTheme.colorScheme.primary.copy(
+                                                                alpha = if (selected) 0.18f else 0.10f
+                                                            )
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        equipmentIcons[et] ?: Icons.Default.Build,
+                                                        null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                                Text(et,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                                            else MaterialTheme.colorScheme.onSurface)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Descripción del problema ──────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("DESCRIPCIÓN DEL PROBLEMA *", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = desc,
+                                onValueChange = {
+                                    desc = it
+                                    FaultClassifier.classify(it)?.let { sug -> type = sug.suggestedType }
+                                },
+                                placeholder = { Text("Describa el problema o falla del equipo…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                modifier = Modifier.fillMaxWidth(), minLines = 3,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                        // Sugerencia automática del FaultClassifier
+                        val suggestion = remember(desc) { FaultClassifier.classify(desc) }
+                        if (suggestion != null) {
+                            Surface(shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(0.6f)) {
+                                Row(modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Lightbulb, null,
+                                        tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                                    Column {
+                                        Text("Causa probable:", style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold)
+                                        Text(suggestion.possibleCause, style = MaterialTheme.typography.bodySmall)
+                                        TextButton(onClick = { diagnosis = suggestion.possibleCause },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.height(24.dp)) {
+                                            Text("Usar como diagnóstico →", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Diagnóstico ───────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("DIAGNÓSTICO", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = diagnosis, onValueChange = { diagnosis = it },
+                                placeholder = { Text("Diagnóstico técnico…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                modifier = Modifier.fillMaxWidth(), minLines = 2,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                    }
+
+                    // ── IDs ───────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("DATOS ADICIONALES", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = clientId, onValueChange = { clientId = it },
+                                label = { Text("ID Cliente") },
+                                leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = equipId, onValueChange = { equipId = it },
+                                label = { Text("ID Equipo") },
+                                leadingIcon = { Icon(Icons.Default.Build, null, modifier = Modifier.size(18.dp)) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                        // Alerta de garantía vigente
+                        val now = System.currentTimeMillis()
+                        val activeWarrantyOrder = remember(equipId, existingOrders) {
+                            existingOrders.filter {
+                                it.equipmentId.isNotBlank() && it.equipmentId == equipId &&
+                                    it.id != (initial?.id ?: "") &&
+                                    it.status == ServiceStatus.COMPLETED &&
+                                    it.warrantyExpiresAt != null && it.warrantyExpiresAt > now
+                            }.maxByOrNull { it.completedAt ?: 0L }
+                        }
+                        if (activeWarrantyOrder != null) {
+                            val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+                            Surface(shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(0.6f)) {
+                                Row(modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.VerifiedUser, null,
+                                        tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
+                                    Column {
+                                        Text("Equipo en garantía", style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "Garantía vigente hasta ${sdf.format(Date(activeWarrantyOrder.warrantyExpiresAt!!))} " +
+                                                "(\"${activeWarrantyOrder.description.take(60)}\"). Si la falla es similar, podría estar cubierta.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Pago ──────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("PAGO", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = totalCostStr,
+                                onValueChange = { v -> if (v.all { it.isDigit() || it == '.' }) totalCostStr = v },
+                                label = { Text("Monto (USD)") },
+                                leadingIcon = { Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(18.dp)) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                placeholder = { Text("0.00") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                        Text("Método de pago", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(PaymentMethod.NONE to "Sin especificar",
+                                PaymentMethod.CASH to "Efectivo",
+                                PaymentMethod.TRANSFER to "Transferencia").forEach { (m, label) ->
+                                FilterChip(selected = paymentMethod == m, onClick = { paymentMethod = m },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) })
+                            }
+                        }
+                        Text("Estado del pago", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(PaymentStatus.NONE to "Sin especificar",
+                                PaymentStatus.PENDING to "Pendiente",
+                                PaymentStatus.PAID to "Pagado").forEach { (s, label) ->
+                                FilterChip(selected = paymentStatus == s, onClick = { paymentStatus = s },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) })
+                            }
+                        }
+                    }
+
+                    // ── Garantía ──────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("GARANTÍA DEL SERVICIO", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                            listOf(0 to "Sin garantía", 1 to "1 mes", 3 to "3 meses",
+                                6 to "6 meses", 12 to "12 meses").forEach { (m, label) ->
+                                FilterChip(selected = warrantyMonths == m, onClick = { warrantyMonths = m },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) })
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }

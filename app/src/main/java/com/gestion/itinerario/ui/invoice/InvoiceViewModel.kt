@@ -47,18 +47,18 @@ class InvoiceViewModel @Inject constructor(
         serviceDescription: String,
         diagnosis: String,
         totalAmount: Double,
+        taxRate: Double = 0.0,
         paymentMethod: PaymentMethod,
         paymentStatus: PaymentStatus,
+        paymentTerms: String = "Contado",
         startDate: Long,
         signatureBitmap: Bitmap?,
-        onDone: (invoiceId: String, invoiceNumber: String) -> Unit
+        onDone: (invoiceId: String, invoiceNumber: String) -> Unit,
+        onError: (Throwable) -> Unit = {}
     ) = viewModelScope.launch {
         try {
-            val profile = profileRepo.getProfile().let { flow ->
-                var p = com.gestion.itinerario.data.entity.CompanyProfile()
-                flow.first().also { p = it }
-                p
-            }
+            val profile = kotlinx.coroutines.withTimeoutOrNull(8_000L) { profileRepo.getProfile().first() }
+                ?: com.gestion.itinerario.data.entity.CompanyProfile()
             val counter = profileRepo.incrementCounter()
             val invoiceNumber = "${profile.invoicePrefix}-${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)}-${counter.toString().padStart(4, '0')}"
 
@@ -67,6 +67,10 @@ class InvoiceViewModel @Inject constructor(
                 bmp.compress(Bitmap.CompressFormat.PNG, 100, baos)
                 android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.DEFAULT)
             } ?: ""
+
+            // El monto ingresado es el subtotal (valor del servicio); el impuesto se suma encima
+            val taxAmount = totalAmount * (taxRate / 100.0)
+            val grandTotal = totalAmount + taxAmount
 
             val invoice = Invoice(
                 invoiceNumber      = invoiceNumber,
@@ -79,10 +83,19 @@ class InvoiceViewModel @Inject constructor(
                 equipmentType      = equipmentType,
                 serviceDescription = serviceDescription,
                 diagnosis          = diagnosis,
-                items              = listOf(InvoiceItem(serviceDescription, totalAmount)),
-                totalAmount        = totalAmount,
+                items              = listOf(InvoiceItem(
+                    description = serviceDescription,
+                    quantity    = 1.0,
+                    unit        = "Servicio",
+                    unitPrice   = totalAmount,
+                    amount      = totalAmount
+                )),
+                taxRate            = taxRate,
+                totalAmount        = grandTotal,
                 paymentMethod      = paymentMethod,
                 paymentStatus      = paymentStatus,
+                paymentTerms       = paymentTerms,
+                companyTaxId       = profile.taxId,
                 clientSignature    = signatureBase64,
                 companyLogoUrl     = profile.logoUrl,
                 startDate          = startDate,
@@ -93,6 +106,7 @@ class InvoiceViewModel @Inject constructor(
             onDone(id, invoiceNumber)
         } catch (e: Exception) {
             e.printStackTrace()
+            onError(e)
         }
     }
 
@@ -108,8 +122,17 @@ class InvoiceViewModel @Inject constructor(
     ): java.io.File = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val logoBitmap: android.graphics.Bitmap? = if (profile.logoUrl.isNotBlank()) {
             try {
-                val stream = java.net.URL(profile.logoUrl).openStream()
-                android.graphics.BitmapFactory.decodeStream(stream)
+                if (profile.logoUrl.startsWith("data:")) {
+                    val b64 = profile.logoUrl.substringAfter(",")
+                    val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } else {
+                    val connection = java.net.URL(profile.logoUrl).openConnection() as java.net.HttpURLConnection
+                    connection.connectTimeout = 3_000
+                    connection.readTimeout   = 3_000
+                    connection.instanceFollowRedirects = true
+                    connection.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+                }
             } catch (_: Exception) { null }
         } else null
         com.gestion.itinerario.ui.invoice.InvoicePdfGenerator.generate(context, invoice, profile, logoBitmap)

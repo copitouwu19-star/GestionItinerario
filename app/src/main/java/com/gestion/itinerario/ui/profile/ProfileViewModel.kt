@@ -35,7 +35,18 @@ class ProfileViewModel @Inject constructor(
             _uploadState.value = UploadState.Success
         } catch (e: Exception) {
             e.printStackTrace()
-            _uploadState.value = UploadState.Error("No se pudo subir el logo")
+            val msg = when {
+                e.message?.contains("permission", ignoreCase = true) == true ||
+                e.message?.contains("403", ignoreCase = true) == true ->
+                    "Sin permiso de Storage — ajusta las reglas en Firebase Console"
+                e.message?.contains("network", ignoreCase = true) == true ||
+                e.message?.contains("unavailable", ignoreCase = true) == true ->
+                    "Sin conexión — verifica tu internet"
+                e.message?.contains("No se pudo leer", ignoreCase = true) == true ->
+                    "No se pudo leer la imagen seleccionada"
+                else -> "Error: ${e.message?.take(80) ?: "desconocido"}"
+            }
+            _uploadState.value = UploadState.Error(msg)
         }
     }
 

@@ -55,10 +55,21 @@ private fun Invoice.toMap(): Map<String, Any?> = mapOf(
     "equipmentType"      to equipmentType,
     "serviceDescription" to serviceDescription,
     "diagnosis"          to diagnosis,
-    "items"              to items.map { mapOf("description" to it.description, "amount" to it.amount) },
+    "items"              to items.map {
+        mapOf(
+            "description" to it.description,
+            "quantity"    to it.quantity,
+            "unit"        to it.unit,
+            "unitPrice"   to it.unitPrice,
+            "amount"      to it.amount
+        )
+    },
+    "taxRate"            to taxRate,
     "totalAmount"        to totalAmount,
     "paymentMethod"      to paymentMethod.name,
     "paymentStatus"      to paymentStatus.name,
+    "paymentTerms"       to paymentTerms,
+    "companyTaxId"       to companyTaxId,
     "clientSignature"    to clientSignature,
     "companyLogoUrl"     to companyLogoUrl,
     "startDate"          to startDate,
@@ -85,11 +96,17 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toInvoice(): Invoice?
             diagnosis          = getString("diagnosis") ?: "",
             items              = rawItems.map { InvoiceItem(
                 description = it["description"] as? String ?: "",
+                quantity    = (it["quantity"] as? Number)?.toDouble() ?: 1.0,
+                unit        = it["unit"] as? String ?: "Servicio",
+                unitPrice   = (it["unitPrice"] as? Number)?.toDouble() ?: 0.0,
                 amount      = (it["amount"] as? Number)?.toDouble() ?: 0.0
             )},
+            taxRate            = getDouble("taxRate") ?: 0.0,
             totalAmount        = getDouble("totalAmount") ?: 0.0,
             paymentMethod      = runCatching { PaymentMethod.valueOf(getString("paymentMethod") ?: "NONE") }.getOrDefault(PaymentMethod.NONE),
             paymentStatus      = runCatching { PaymentStatus.valueOf(getString("paymentStatus") ?: "NONE") }.getOrDefault(PaymentStatus.NONE),
+            paymentTerms       = getString("paymentTerms") ?: "Contado",
+            companyTaxId       = getString("companyTaxId") ?: "",
             clientSignature    = getString("clientSignature") ?: "",
             companyLogoUrl     = getString("companyLogoUrl") ?: "",
             startDate          = getLong("startDate") ?: 0L,

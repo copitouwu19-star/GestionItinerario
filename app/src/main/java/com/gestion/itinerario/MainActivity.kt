@@ -8,13 +8,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -24,7 +32,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.gestion.itinerario.ui.AppNavGraph
 import com.gestion.itinerario.ui.Routes
 import com.gestion.itinerario.ui.theme.GestionItinerarioTheme
+import com.gestion.itinerario.ui.theme.ThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 data class NavItem(val route: String, val label: String, val icon: ImageVector)
 
@@ -57,7 +68,9 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            GestionItinerarioTheme {
+            val themeViewModel: ThemeViewModel = hiltViewModel()
+            val paletteId by themeViewModel.paletteId.collectAsStateWithLifecycle()
+            GestionItinerarioTheme(paletteId = paletteId) {
                 var isLoggedIn by remember {
                     mutableStateOf(FirebaseAuth.getInstance().currentUser != null)
                 }
@@ -70,25 +83,22 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
                         if (showBottomBar) {
-                            NavigationBar {
-                                bottomNavItems.forEach { item ->
-                                    NavigationBarItem(
-                                        icon = { Icon(item.icon, contentDescription = item.label) },
-                                        label = { Text(item.label) },
-                                        selected = navBackStackEntry?.destination?.hierarchy
-                                            ?.any { it.route == item.route } == true,
-                                        onClick = {
-                                            navController.navigate(item.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
+                            GradientBottomNavBar(
+                                items = bottomNavItems,
+                                isSelected = { item ->
+                                    navBackStackEntry?.destination?.hierarchy
+                                        ?.any { it.route == item.route } == true
+                                },
+                                onItemClick = { item ->
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
                                         }
-                                    )
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
-                            }
+                            )
                         }
                     }
                 ) { innerPadding ->
@@ -107,6 +117,66 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Barra de navegación inferior tipo "píldora" con un círculo flotante de gradiente
+ * que resalta la pestaña activa (inspirada en el diseño de referencia).
+ */
+@Composable
+private fun GradientBottomNavBar(
+    items: List<NavItem>,
+    isSelected: (NavItem) -> Boolean,
+    onItemClick: (NavItem) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val gradient = androidx.compose.ui.graphics.Brush.linearGradient(
+                listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+            )
+            items.forEach { item ->
+                val selected = isSelected(item)
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onItemClick(item) }
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .background(gradient, shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(item.icon, contentDescription = item.label, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                    } else {
+                        Icon(item.icon, contentDescription = item.label,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                        Text(item.label, style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

@@ -208,7 +208,7 @@ fun NewProductTypeDialog(onDismiss: () -> Unit, onEquipment: () -> Unit, onSpare
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onEquipment() },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Primary80.copy(alpha = 0.1f))
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
@@ -223,7 +223,7 @@ fun NewProductTypeDialog(onDismiss: () -> Unit, onEquipment: () -> Unit, onSpare
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onSparePart() },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = Secondary80.copy(alpha = 0.1f))
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
@@ -369,8 +369,8 @@ fun EquipmentCard(eq: Equipment, onEdit: (Equipment) -> Unit, onDelete: (Equipme
         EquipmentStatus.IN_REPAIR -> "En Reparación"
         EquipmentStatus.DELIVERED -> "Entregado"
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(statusColor.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center) {
@@ -417,7 +417,7 @@ fun SparePartCard(sp: SparePart, onEdit: (SparePart) -> Unit, onDelete: (SparePa
         StockLevel.NORMAL   -> null
     }
     var showMovement by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = cardColor)) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {

@@ -40,8 +40,33 @@ class ServiceViewModel @Inject constructor(
     fun save(order: ServiceOrder) = viewModelScope.launch { serviceRepo.save(order) }
     fun update(order: ServiceOrder) = viewModelScope.launch { serviceRepo.update(order) }
     fun delete(order: ServiceOrder) = viewModelScope.launch { serviceRepo.delete(order) }
-    fun updateStatus(order: ServiceOrder, status: ServiceStatus) =
-        viewModelScope.launch { serviceRepo.update(order.copy(status = status)) }
+    fun updateStatus(order: ServiceOrder, status: ServiceStatus) = viewModelScope.launch {
+        val updated = if (status == ServiceStatus.COMPLETED && order.status != ServiceStatus.COMPLETED) {
+            val completedAt = System.currentTimeMillis()
+            val expiresAt = if (order.warrantyMonths > 0) {
+                val cal = java.util.Calendar.getInstance().apply {
+                    timeInMillis = completedAt
+                    add(java.util.Calendar.MONTH, order.warrantyMonths)
+                }
+                cal.timeInMillis
+            } else null
+            order.copy(status = status, completedAt = completedAt, warrantyExpiresAt = expiresAt)
+        } else {
+            order.copy(status = status)
+        }
+        serviceRepo.update(updated)
+    }
+
+    /** Busca órdenes completadas del mismo equipo cuya garantía sigue vigente. */
+    suspend fun findActiveWarranty(equipmentId: String): ServiceOrder? {
+        if (equipmentId.isBlank()) return null
+        val now = System.currentTimeMillis()
+        return orders.value.filter {
+            it.equipmentId == equipmentId &&
+                it.status == ServiceStatus.COMPLETED &&
+                it.warrantyExpiresAt != null && it.warrantyExpiresAt > now
+        }.maxByOrNull { it.completedAt ?: 0L }
+    }
 
     /** SCHEDULED → IN_PROGRESS */
     fun startAppointment(a: Appointment) = viewModelScope.launch {

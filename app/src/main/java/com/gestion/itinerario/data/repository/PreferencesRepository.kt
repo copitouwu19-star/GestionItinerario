@@ -18,10 +18,18 @@ class PreferencesRepository @Inject constructor(
 ) {
     private val PIN_KEY = stringPreferencesKey("user_pin")
     private val PIN_ENABLED_KEY = stringPreferencesKey("pin_enabled")
+    private val PALETTE_KEY = stringPreferencesKey("color_palette")
 
     val pin: Flow<String?> = context.dataStore.data.map { it[PIN_KEY] }
     val isPinEnabled: Flow<Boolean> = context.dataStore.data.map {
         it[PIN_ENABLED_KEY] == "true"
+    }
+
+    /** Id de la paleta de colores elegida por el usuario (ver AppPalettes). */
+    val colorPalette: Flow<String> = context.dataStore.data.map { it[PALETTE_KEY] ?: "indigo" }
+
+    suspend fun setColorPalette(id: String) {
+        context.dataStore.edit { prefs -> prefs[PALETTE_KEY] = id }
     }
 
     suspend fun setPin(pin: String) {

@@ -2,6 +2,7 @@ package com.gestion.itinerario.data.entity
 
 data class CompanyProfile(
     val companyName: String = "",
+    val taxId: String = "",
     val ownerName: String = "",
     val phone: String = "",
     val email: String = "",

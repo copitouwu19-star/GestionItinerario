@@ -107,7 +107,9 @@ private fun ServiceOrder.toMap(): Map<String, Any?> = mapOf(
     "photosAfter"   to photosAfter,
     "invoiceId"     to invoiceId,
     "createdAt"     to createdAt,
-    "completedAt"   to completedAt
+    "completedAt"   to completedAt,
+    "warrantyMonths"    to warrantyMonths,
+    "warrantyExpiresAt" to warrantyExpiresAt
 )
 
 @Suppress("UNCHECKED_CAST")
@@ -130,7 +132,9 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toServiceOrder(): Ser
             photosAfter   = (get("photosAfter") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
             invoiceId     = getString("invoiceId") ?: "",
             createdAt     = getLong("createdAt") ?: System.currentTimeMillis(),
-            completedAt   = getLong("completedAt")
+            completedAt   = getLong("completedAt"),
+            warrantyMonths    = (getLong("warrantyMonths") ?: 0L).toInt(),
+            warrantyExpiresAt = getLong("warrantyExpiresAt")
         )
     } catch (e: Exception) { null }
 }

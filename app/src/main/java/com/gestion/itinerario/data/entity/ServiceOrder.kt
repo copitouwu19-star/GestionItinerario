@@ -22,5 +22,7 @@ data class ServiceOrder(
     val photosAfter: List<String> = emptyList(),
     val invoiceId: String = "",
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    val warrantyMonths: Int = 0,
+    val warrantyExpiresAt: Long? = null
 )
