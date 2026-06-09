@@ -1,6 +1,7 @@
 package com.gestion.itinerario.ui.services
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.PaddingValues
@@ -224,6 +225,7 @@ fun ServicesScreen(
         ServiceOrderFormDialog(
             initial   = editOrder,
             existingOrders = orders,
+            clients   = clients,
             onDismiss = { showDialog = false },
             onSave    = { o ->
                 if (editOrder == null) viewModel.save(o) else viewModel.update(o.copy(id = editOrder!!.id))
@@ -712,6 +714,7 @@ fun ServiceOrderCard(
 fun ServiceOrderFormDialog(
     initial: ServiceOrder?,
     existingOrders: List<ServiceOrder> = emptyList(),
+    clients: List<com.gestion.itinerario.data.entity.Client> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (ServiceOrder) -> Unit
 ) {
@@ -720,6 +723,7 @@ fun ServiceOrderFormDialog(
     var type          by remember { mutableStateOf(initial?.type ?: ServiceType.MAINTENANCE) }
     var equipmentType by remember { mutableStateOf(initial?.equipmentType ?: "") }
     var clientId      by remember { mutableStateOf(initial?.clientId ?: "") }
+    var clientDropdownExpanded by remember { mutableStateOf(false) }
     var equipId       by remember { mutableStateOf(initial?.equipmentId ?: "") }
     var totalCostStr  by remember { mutableStateOf(if ((initial?.totalCost ?: 0.0) > 0.0) initial!!.totalCost.toString() else "") }
     var paymentMethod by remember { mutableStateOf(initial?.paymentMethod ?: PaymentMethod.NONE) }
@@ -1045,18 +1049,67 @@ fun ServiceOrderFormDialog(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                             letterSpacing = 1.sp)
-                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
-                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = clientId, onValueChange = { clientId = it },
-                                label = { Text("ID Cliente") },
-                                leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
-                                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent),
-                                shape = RoundedCornerShape(16.dp)
-                            )
+                        // ── Dropdown de cliente ───────────────────────────
+                        if (clients.isNotEmpty()) {
+                            val selectedClientName = clients.firstOrNull { it.id == clientId }
+                                ?.let { "${it.name} ${it.lastName}".trim() } ?: ""
+                            Box {
+                                Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                    shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedTextField(
+                                        value = selectedClientName.ifBlank { "Seleccione un cliente" },
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("CLIENTE") },
+                                        leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                                        trailingIcon = {
+                                            Icon(
+                                                if (clientDropdownExpanded) Icons.Default.KeyboardArrowUp
+                                                else Icons.Default.KeyboardArrowDown,
+                                                null
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Color.Transparent,
+                                            unfocusedBorderColor = Color.Transparent),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+                                Box(modifier = Modifier.matchParentSize().clickable { clientDropdownExpanded = true })
+                                DropdownMenu(
+                                    expanded = clientDropdownExpanded,
+                                    onDismissRequest = { clientDropdownExpanded = false },
+                                    modifier = Modifier.fillMaxWidth(0.9f)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Sin cliente asignado", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                        onClick = { clientId = ""; clientDropdownExpanded = false }
+                                    )
+                                    clients.forEach { c ->
+                                        DropdownMenuItem(
+                                            text = { Text("${c.name} ${c.lastName}".trim()) },
+                                            leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                                            onClick = { clientId = c.id; clientDropdownExpanded = false }
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                                OutlinedTextField(
+                                    value = clientId, onValueChange = { clientId = it },
+                                    label = { Text("ID Cliente") },
+                                    leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp)) },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                            }
                         }
                         Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
                             shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {

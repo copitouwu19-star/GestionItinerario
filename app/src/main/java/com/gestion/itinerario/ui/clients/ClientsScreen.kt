@@ -2,7 +2,9 @@ package com.gestion.itinerario.ui.clients
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -196,96 +198,91 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
         colors   = CardDefaults.cardColors(containerColor = Color.White),
         onClick  = onView
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // Borde izquierdo degradado (morado→rosa para Natural, al revés para Jurídica)
             Box(
                 modifier = Modifier
                     .width(5.dp)
                     .fillMaxHeight()
-                    .background(accentColor, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            if (c.clientType == "Persona Jurídica")
+                                listOf(Secondary40, Primary40)
+                            else listOf(Primary40, Secondary40)
+                        ),
+                        shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp)
+                    )
             )
-            Box(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .padding(end = 130.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Primary80.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+            // Contenido principal
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (c.clientType == "Persona Jurídica")
+                            Secondary80.copy(alpha = 0.15f)
+                        else Primary80.copy(alpha = 0.12f)
                     ) {
-                        Text(c.name.take(1).uppercase(), color = Primary80, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            c.clientType,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (c.clientType == "Persona Jurídica") Secondary40 else Primary40
                         )
-                        Spacer(Modifier.height(2.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (c.clientType == "Persona Jurídica")
-                                Secondary80.copy(alpha = 0.15f)
-                            else Primary80.copy(alpha = 0.12f)
+                    }
+                    if (c.phone.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            Text(
-                                c.clientType,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style    = MaterialTheme.typography.labelSmall,
-                                color    = if (c.clientType == "Persona Jurídica") Secondary80 else Primary80
-                            )
+                            Icon(Icons.Default.Phone, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp))
+                            Text(c.phone, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (c.phone.isNotBlank()) {
-                            Spacer(Modifier.height(6.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(Icons.Default.Phone, null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp))
-                                Text(c.phone, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        if (c.address.isNotBlank()) {
-                            Spacer(Modifier.height(2.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(Icons.Default.LocationOn, null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(14.dp))
-                                Text(c.address, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                            }
+                    }
+                    if (c.address.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.LocationOn, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp))
+                            Text(c.address, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
                     }
                 }
-                // ── Badges de acción (esquina superior derecha) ───────────────
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 10.dp, end = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // ── Badges de acción (columna derecha) ──────────────────────
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(start = 6.dp)
                 ) {
                     if (c.phone.isNotBlank()) {
-                        ActionBadge(onClick = { openWhatsApp(context, c.phone) }, containerColor = WhatsAppGreen.copy(alpha = 0.15f)) {
+                        ActionBadge(onClick = { openWhatsApp(context, c.phone) },
+                            containerColor = WhatsAppGreen.copy(alpha = 0.15f)) {
                             Icon(painter = painterResource(R.drawable.ic_whatsapp),
                                 contentDescription = "WhatsApp", tint = WhatsAppGreen, modifier = Modifier.size(20.dp))
                         }
                     }
-                    ActionBadge(onClick = onEdit, containerColor = Primary80.copy(alpha = 0.15f)) {
-                        Icon(Icons.Default.Edit, null, tint = Primary80, modifier = Modifier.size(20.dp))
+                    ActionBadge(onClick = onEdit, containerColor = Color(0xFF2196F3).copy(alpha = 0.13f)) {
+                        Icon(Icons.Default.Edit, null, tint = Color(0xFF2196F3), modifier = Modifier.size(20.dp))
                     }
-                    ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.15f)) {
+                    ActionBadge(onClick = onDelete, containerColor = StatusLowStock.copy(alpha = 0.13f)) {
                         Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(20.dp))
                     }
                 }
@@ -362,24 +359,57 @@ fun ClientDetailScreen(
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } },
                 actions = {
-                    Box {
-                        IconButton(onClick = { showMoreMenu = true }) {
-                            Icon(Icons.Default.MoreVert, null)
-                        }
-                        DropdownMenu(
-                            expanded = showMoreMenu,
-                            onDismissRequest = { showMoreMenu = false }
-                        ) {
-                            if (client.phone.isNotBlank()) {
-                                DropdownMenuItem(
-                                    text = { Text("Abrir WhatsApp") },
-                                    leadingIcon = {
-                                        Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                                            contentDescription = null, tint = WhatsAppGreen,
-                                            modifier = Modifier.size(18.dp))
-                                    },
-                                    onClick = { showMoreMenu = false; openWhatsApp(context, client.phone) }
+                    if (client.phone.isNotBlank()) {
+                        Box {
+                            IconButton(onClick = { showMoreMenu = true }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_whatsapp),
+                                    contentDescription = "WhatsApp",
+                                    tint = WhatsAppGreen
                                 )
+                            }
+                            DropdownMenu(
+                                expanded = showMoreMenu,
+                                onDismissRequest = { showMoreMenu = false }
+                            ) {
+                                Text(
+                                    "Mensaje rápido",
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                HorizontalDivider()
+                                listOf(
+                                    "Voy en camino, nos vemos pronto.",
+                                    "Confirmando nuestra cita. Estaré puntual.",
+                                    "Su servicio ha sido completado. ¡Gracias por su preferencia!",
+                                    "Le recuerdo que tiene un mantenimiento próximamente.",
+                                    ""
+                                ).forEach { msg ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                if (msg.isEmpty()) "Escribir mensaje..." else msg,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 2
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            if (msg.isEmpty()) {
+                                                Icon(Icons.Default.Edit, null, tint = WhatsAppGreen,
+                                                    modifier = Modifier.size(16.dp))
+                                            } else {
+                                                Icon(painter = painterResource(R.drawable.ic_whatsapp),
+                                                    contentDescription = null, tint = WhatsAppGreen,
+                                                    modifier = Modifier.size(16.dp))
+                                            }
+                                        },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            openWhatsApp(context, client.phone, msg)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -451,7 +481,7 @@ fun ClientDetailScreen(
                 }
             }
 
-            // ── Estadísticas: Equipos + Facturas ──────────────────────────────
+            // ── Estadísticas: Servicios + Facturas ────────────────────────────
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -459,8 +489,8 @@ fun ClientDetailScreen(
                 ) {
                     StatTileCard(
                         modifier = Modifier.weight(1f),
-                        count = equipment.size,
-                        label = "EQUIPOS",
+                        count = services.size,
+                        label = "SERVICIOS",
                         accentColor = Primary40
                     )
                     StatTileCard(
@@ -731,9 +761,6 @@ private fun InvoiceHistoryCard(
                 Text(sdf.format(java.util.Date(inv.createdAt)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (inv.equipmentType.isNotBlank())
-                    Text("Equipo: ${inv.equipmentType}", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(2.dp))
                 OutlinedButton(
                     onClick = onViewPdf, enabled = !isLoadingPdf,
@@ -802,146 +829,319 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
         )
     }
 
-    AlertDialog(
+    fun doSave() {
+        if (!isJuridicaMode) {
+            if (name.any { it.isDigit() }) { errorMessage = "El nombre no puede contener números."; return }
+            if (lastName.any { it.isDigit() }) { errorMessage = "El apellido no puede contener números."; return }
+        }
+        if (phoneNumber.length != 7) { errorMessage = "El número de teléfono debe tener exactamente 7 dígitos."; return }
+        onSave(Client(
+            name       = name.trim(),
+            lastName   = if (isJuridicaMode) "" else lastName.trim(),
+            phone      = "$phoneCode$phoneNumber",
+            email      = email.trim(),
+            address    = address.trim(),
+            notes      = notes.trim(),
+            clientType = clientType
+        ))
+    }
+
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(if (initial == null) "Nuevo Cliente" else "Editar Cliente",
-                fontWeight = FontWeight.Bold)
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text("Tipo de cliente:", style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CLIENT_TYPES.forEach { tipo ->
-                        FilterChip(
-                            selected = clientType == tipo,
-                            onClick  = { clientType = tipo; if (tipo == "Persona Jurídica") lastName = "" },
-                            label    = { Text(tipo, style = MaterialTheme.typography.labelSmall) },
-                            modifier = Modifier.weight(1f),
-                            leadingIcon = if (clientType == tipo) {{ Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }} else null
-                        )
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
-
-                if (isJuridicaMode) {
-                    OutlinedTextField(
-                        value = name, onValueChange = { name = it },
-                        label = { Text("Nombre de la empresa *") },
-                        placeholder = { Text("Nombre de la empresa") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Business, null) }
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                topBar = {
+                    @OptIn(ExperimentalMaterial3Api::class)
+                    TopAppBar(
+                        title = { Text(if (initial == null) "Nuevo Cliente" else "Editar Cliente", fontWeight = FontWeight.Bold) },
+                        navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.ArrowBack, null) } },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
                     )
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { v -> if (!v.any { it.isDigit() }) name = v },
-                            label = { Text("Nombre *") },
-                            modifier = Modifier.weight(1f), singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = lastName,
-                            onValueChange = { v -> if (!v.any { it.isDigit() }) lastName = v },
-                            label = { Text("Apellido *") },
-                            modifier = Modifier.weight(1f), singleLine = true
-                        )
-                    }
-                    Text("El nombre y apellido no pueden contener números",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-                }
-
-                Text("Teléfono *", style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    ExposedDropdownMenuBox(
-                        expanded = codeDropdownExpanded,
-                        onExpandedChange = { codeDropdownExpanded = !codeDropdownExpanded },
-                        modifier = Modifier.width(120.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = phoneCode, onValueChange = {}, readOnly = true,
-                            label = { Text("Código") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = codeDropdownExpanded) },
-                            modifier = Modifier.menuAnchor(), singleLine = true
-                        )
-                        ExposedDropdownMenu(
-                            expanded = codeDropdownExpanded,
-                            onDismissRequest = { codeDropdownExpanded = false }
+                },
+                bottomBar = {
+                    Surface(shadowElevation = 8.dp, color = Color.White) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            PHONE_CODES.forEach { code ->
-                                DropdownMenuItem(
-                                    text = { Text(code) },
-                                    onClick = { phoneCode = code; codeDropdownExpanded = false }
-                                )
+                            OutlinedButton(
+                                onClick = onDismiss, modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(50)
+                            ) { Text("Cancelar") }
+                            Button(
+                                onClick = { doSave() },
+                                enabled = saveEnabled,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .background(
+                                            brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                                listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                                            ),
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                        .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                        Text("Guardar", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
                             }
                         }
                     }
-                    OutlinedTextField(
-                        value = phoneNumber,
-                        onValueChange = { v -> val d = v.filter { it.isDigit() }; if (d.length <= 7) phoneNumber = d },
-                        label = { Text("7 dígitos") },
-                        placeholder = { Text("1234567") },
-                        modifier = Modifier.weight(1f), singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = phoneNumber.isNotEmpty() && phoneNumber.length < 7,
-                        supportingText = {
-                            Text("${phoneNumber.length}/7",
-                                color = if (phoneNumber.length == 7)
-                                    MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    )
                 }
-
-                OutlinedTextField(
-                    value = email, onValueChange = { email = it },
-                    label = { Text("Correo electrónico") },
-                    leadingIcon = { Icon(Icons.Default.Email, null) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                OutlinedTextField(
-                    value = address, onValueChange = { address = it },
-                    label = { Text("Dirección *") },
-                    leadingIcon = { Icon(Icons.Default.LocationOn, null) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                OutlinedTextField(
-                    value = notes, onValueChange = { notes = it },
-                    label = { Text("Notas adicionales") },
-                    modifier = Modifier.fillMaxWidth(), minLines = 2
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (!isJuridicaMode) {
-                        if (name.any { it.isDigit() }) { errorMessage = "El nombre no puede contener números."; return@Button }
-                        if (lastName.any { it.isDigit() }) { errorMessage = "El apellido no puede contener números."; return@Button }
+            ) { scaffoldPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(scaffoldPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // ── Banner ────────────────────────────────────────────────
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                            Box(modifier = Modifier.width(4.dp).fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary))
+                            Row(modifier = Modifier.padding(14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.PersonAdd, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                }
+                                Column {
+                                    Text(
+                                        if (initial == null) "Registrar Cliente" else "Editar Cliente",
+                                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "Complete los datos del cliente.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
-                    if (phoneNumber.length != 7) { errorMessage = "El número de teléfono debe tener exactamente 7 dígitos."; return@Button }
-                    val fullPhone = "$phoneCode$phoneNumber"
-                    onSave(Client(
-                        name       = name.trim(),
-                        lastName   = if (isJuridicaMode) "" else lastName.trim(),
-                        phone      = fullPhone,
-                        email      = email.trim(),
-                        address    = address.trim(),
-                        notes      = notes.trim(),
-                        clientType = clientType
-                    ))
-                },
-                enabled = saveEnabled
-            ) { Text("Guardar") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
-    )
+
+                    // ── Tipo de cliente ───────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("TIPO DE CLIENTE", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            CLIENT_TYPES.forEach { tipo ->
+                                val selected = clientType == tipo
+                                Surface(
+                                    onClick = { clientType = tipo; if (tipo == "Persona Jurídica") lastName = "" },
+                                    shape = RoundedCornerShape(50),
+                                    color = if (selected) MaterialTheme.colorScheme.primary else Color.White,
+                                    shadowElevation = if (selected) 0.dp else 2.dp,
+                                    border = if (selected) null else
+                                        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center) {
+                                        Icon(
+                                            if (tipo == "Persona Jurídica") Icons.Default.Business else Icons.Default.Person,
+                                            null, tint = if (selected) Color.White else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(tipo, style = MaterialTheme.typography.labelMedium,
+                                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Nombre ────────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(if (isJuridicaMode) "NOMBRE DE LA EMPRESA *" else "NOMBRE Y APELLIDO *",
+                            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
+                        if (isJuridicaMode) {
+                            Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                                OutlinedTextField(
+                                    value = name, onValueChange = { name = it },
+                                    placeholder = { Text("Nombre de la empresa") },
+                                    leadingIcon = { Icon(Icons.Default.Business, null) },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                    shadowElevation = 2.dp, modifier = Modifier.weight(1f)) {
+                                    OutlinedTextField(
+                                        value = name,
+                                        onValueChange = { v -> if (!v.any { it.isDigit() }) name = v },
+                                        placeholder = { Text("Nombre") },
+                                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Color.Transparent,
+                                            unfocusedBorderColor = Color.Transparent),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+                                Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                    shadowElevation = 2.dp, modifier = Modifier.weight(1f)) {
+                                    OutlinedTextField(
+                                        value = lastName,
+                                        onValueChange = { v -> if (!v.any { it.isDigit() }) lastName = v },
+                                        placeholder = { Text("Apellido") },
+                                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Color.Transparent,
+                                            unfocusedBorderColor = Color.Transparent),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Teléfono ──────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("TELÉFONO *", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ExposedDropdownMenuBox(
+                                expanded = codeDropdownExpanded,
+                                onExpandedChange = { codeDropdownExpanded = !codeDropdownExpanded },
+                                modifier = Modifier.width(130.dp)
+                            ) {
+                                Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                    shadowElevation = 2.dp) {
+                                    OutlinedTextField(
+                                        value = phoneCode, onValueChange = {}, readOnly = true,
+                                        placeholder = { Text("Código") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = codeDropdownExpanded) },
+                                        modifier = Modifier.menuAnchor().fillMaxWidth(), singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Color.Transparent,
+                                            unfocusedBorderColor = Color.Transparent),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                }
+                                ExposedDropdownMenu(expanded = codeDropdownExpanded,
+                                    onDismissRequest = { codeDropdownExpanded = false }) {
+                                    PHONE_CODES.forEach { code ->
+                                        DropdownMenuItem(text = { Text(code) },
+                                            onClick = { phoneCode = code; codeDropdownExpanded = false })
+                                    }
+                                }
+                            }
+                            Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                                shadowElevation = 2.dp, modifier = Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    value = phoneNumber,
+                                    onValueChange = { v -> val d = v.filter { it.isDigit() }; if (d.length <= 7) phoneNumber = d },
+                                    placeholder = { Text("1234567") },
+                                    leadingIcon = { Icon(Icons.Default.Phone, null) },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    isError = phoneNumber.isNotEmpty() && phoneNumber.length < 7,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                            }
+                        }
+                        if (phoneNumber.isNotEmpty())
+                            Text("${phoneNumber.length}/7 dígitos",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (phoneNumber.length == 7) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    // ── Dirección ─────────────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("DIRECCIÓN *", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = address, onValueChange = { address = it },
+                                placeholder = { Text("Ej. Caracas, Venezuela") },
+                                leadingIcon = { Icon(Icons.Default.LocationOn, null) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                    }
+
+                    // ── Correo (opcional) ──────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("CORREO ELECTRÓNICO", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = email, onValueChange = { email = it },
+                                placeholder = { Text("correo@ejemplo.com") },
+                                leadingIcon = { Icon(Icons.Default.Email, null) },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                    }
+
+                    // ── Notas adicionales ─────────────────────────────────────
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("NOTAS ADICIONALES", style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp)
+                        Surface(shape = RoundedCornerShape(16.dp), color = Color.White,
+                            shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = notes, onValueChange = { notes = it },
+                                placeholder = { Text("Ej. El cliente solicita llamar antes de llegar…") },
+                                modifier = Modifier.fillMaxWidth(), minLines = 3,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
