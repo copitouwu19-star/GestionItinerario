@@ -25,6 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gestion.itinerario.data.entity.Appointment
@@ -76,7 +77,6 @@ fun ClientsScreen(
     var detailClient by remember { mutableStateOf<Client?>(null) }
     var confirmDeleteClient by remember { mutableStateOf<Client?>(null) }
 
-    // Diálogo de confirmación eliminar cliente
     if (confirmDeleteClient != null) {
         AlertDialog(
             onDismissRequest = { confirmDeleteClient = null },
@@ -113,7 +113,7 @@ fun ClientsScreen(
                         bottom = maxOf(
                             innerPadding.calculateBottomPadding(),
                             scaffoldPadding.calculateBottomPadding()
-                        ) + 72.dp // Espacio para el FAB
+                        ) + 72.dp
                     )
                     .fillMaxSize()
             ) {
@@ -162,15 +162,11 @@ fun ClientsScreen(
             }
         }
 
-        // ── FAB fuera del Scaffold para que siempre sea visible ───────────────
         FloatingActionButton(
             onClick = { editClient = null; showDialog = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(
-                    end    = 16.dp,
-                    bottom = innerPadding.calculateBottomPadding() + 16.dp
-                ),
+                .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
             containerColor = Primary40
         ) {
             Icon(Icons.Default.PersonAdd, null, tint = Color.White)
@@ -190,6 +186,7 @@ fun ClientsScreen(
     }
 }
 
+// ─── Tarjeta de cliente ───────────────────────────────────────────────────────
 @Composable
 fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val context = LocalContext.current
@@ -198,16 +195,23 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(18.dp),
-        colors   = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        colors   = CardDefaults.cardColors(containerColor = Color.White),
         onClick  = onView
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier
-                .width(5.dp)
-                .fillMaxHeight()
-                .background(accentColor, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)))
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(accentColor, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+            )
             Box(modifier = Modifier.weight(1f)) {
-                Row(modifier = Modifier.padding(16.dp).padding(end = 116.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .padding(end = 130.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -219,11 +223,16 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
-                            fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            c.name + if (c.lastName.isNotBlank()) " ${c.lastName}" else "",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(2.dp))
                         Surface(
-                            shape  = RoundedCornerShape(6.dp),
-                            color  = if (c.clientType == "Persona Jurídica")
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (c.clientType == "Persona Jurídica")
                                 Secondary80.copy(alpha = 0.15f)
                             else Primary80.copy(alpha = 0.12f)
                         ) {
@@ -235,7 +244,7 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
                             )
                         }
                         if (c.phone.isNotBlank()) {
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(6.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -247,21 +256,18 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (c.phone.isNotBlank() && c.address.isNotBlank()) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 4.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
-                        }
-                        if (c.address.isNotBlank()) Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(Icons.Default.LocationOn, null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp))
-                            Text(c.address, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        if (c.address.isNotBlank()) {
+                            Spacer(Modifier.height(2.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.LocationOn, null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp))
+                                Text(c.address, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            }
                         }
                     }
                 }
@@ -290,7 +296,6 @@ fun ClientCard(c: Client, accentIndex: Int = 0, onView: () -> Unit, onEdit: () -
     }
 }
 
-/** Badge circular pequeño usado para acciones rápidas (WhatsApp/Editar/Eliminar) en la esquina de una tarjeta. */
 @Composable
 private fun ActionBadge(onClick: () -> Unit, containerColor: Color, content: @Composable () -> Unit) {
     Surface(
@@ -305,6 +310,20 @@ private fun ActionBadge(onClick: () -> Unit, containerColor: Color, content: @Co
     }
 }
 
+// ─── Cabecera de sección estilo referencia ────────────────────────────────────
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 0.5.sp,
+        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+    )
+}
+
+// ─── Pantalla de detalle del cliente ─────────────────────────────────────────
 @Composable
 fun ClientDetailScreen(
     client: Client,
@@ -321,18 +340,16 @@ fun ClientDetailScreen(
     val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
     val pdfScope = rememberCoroutineScope()
     var generatingInvoiceId by remember { mutableStateOf<String?>(null) }
-
     var showWhatsAppMenu by remember { mutableStateOf(false) }
 
-    val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    val sdf      = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
     val sdfShort = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
-    // Fallas recurrentes: agrupar descripciones de servicios y contar repeticiones
     val recurringFaults = remember(services) {
         services.filter { it.description.isNotBlank() }
             .groupBy { it.description.lowercase().trim() }
             .filter { it.value.size > 1 }
-            .map { (desc, list) -> Pair(list.first().description, list.size) }
+            .map { (_, list) -> Pair(list.first().description, list.size) }
             .sortedByDescending { it.second }
             .take(5)
     }
@@ -343,11 +360,15 @@ fun ClientDetailScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("${client.name}${if (client.lastName.isNotBlank()) " ${client.lastName}" else ""}",
-                            fontWeight = FontWeight.Bold)
-                        Text("${services.size} servicio(s) • ${equipment.size} equipo(s)",
+                        Text(
+                            "${client.name}${if (client.lastName.isNotBlank()) " ${client.lastName}" else ""}",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "${services.size} servicio(s) · ${equipment.size} equipo(s)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } },
@@ -355,14 +376,17 @@ fun ClientDetailScreen(
                     if (client.phone.isNotBlank()) {
                         Box {
                             IconButton(onClick = { showWhatsAppMenu = true }) {
-                                Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                                    contentDescription = "WhatsApp", tint = WhatsAppGreen)
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_whatsapp),
+                                    contentDescription = "WhatsApp", tint = WhatsAppGreen
+                                )
                             }
                             DropdownMenu(
                                 expanded = showWhatsAppMenu,
                                 onDismissRequest = { showWhatsAppMenu = false }
                             ) {
-                                Text("WhatsApp rápido", modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                Text("WhatsApp rápido",
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 HorizontalDivider()
@@ -375,9 +399,11 @@ fun ClientDetailScreen(
                                 ).forEach { msg ->
                                     DropdownMenuItem(
                                         text = {
-                                            Text(if (msg.isEmpty()) "Escribir mensaje..." else msg,
+                                            Text(
+                                                if (msg.isEmpty()) "Escribir mensaje..." else msg,
                                                 style = MaterialTheme.typography.bodySmall,
-                                                maxLines = 2)
+                                                maxLines = 2
+                                            )
                                         },
                                         leadingIcon = {
                                             if (msg.isEmpty()) {
@@ -404,27 +430,84 @@ fun ClientDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Info básica ────────────────────────────────────────────────────
+            // ── Banner del cliente (estilo referencia) ─────────────────────────
             item {
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Información del Cliente", fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium)
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(
-                                if (client.clientType == "Persona Jurídica") Icons.Default.Business
-                                else Icons.Default.Person,
-                                null, tint = Primary80, modifier = Modifier.size(18.dp))
-                            Text(client.clientType, style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium, color = Primary80)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                        Box(
+                            modifier = Modifier
+                                .width(5.dp)
+                                .fillMaxHeight()
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp)
+                                )
+                        )
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    if (client.clientType == "Persona Jurídica") Icons.Default.Business
+                                    else Icons.Default.Person,
+                                    null, tint = Color.White, modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    "${client.name}${if (client.lastName.isNotBlank()) " ${client.lastName}" else ""}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    client.clientType,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (client.phone.isNotBlank()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Phone, null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(12.dp))
+                                        Text(client.phone,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
                         }
-                        if (client.phone.isNotBlank())   InfoRow(Icons.Default.Phone, client.phone)
+                    }
+                }
+            }
+
+            // ── Info del cliente ───────────────────────────────────────────────
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SectionHeader("Información del cliente")
                         if (client.email.isNotBlank())   InfoRow(Icons.Default.Email, client.email)
                         if (client.address.isNotBlank()) InfoRow(Icons.Default.LocationOn, client.address)
                         if (client.notes.isNotBlank())   InfoRow(Icons.Default.Notes, client.notes)
-                        // Acceso rápido WhatsApp
                         if (client.phone.isNotBlank()) {
                             Spacer(Modifier.height(4.dp))
                             Button(
@@ -444,23 +527,23 @@ fun ClientDetailScreen(
 
             // ── Fallas recurrentes ─────────────────────────────────────────────
             if (recurringFaults.isNotEmpty()) {
-                item {
-                    Text("Fallas recurrentes", fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.titleSmall)
-                }
+                item { SectionHeader("Fallas recurrentes") }
                 items(recurringFaults) { (fault, count) ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(containerColor = StatusLowStock.copy(alpha = 0.08f))) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = StatusLowStock.copy(alpha = 0.08f))
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Icon(Icons.Default.Warning, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))
-                            Text(fault, modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium)
-                            Surface(shape = RoundedCornerShape(18.dp),
-                                color = StatusLowStock.copy(alpha = 0.2f)) {
-                                Text("×$count", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall, color = StatusLowStock,
-                                    fontWeight = FontWeight.Bold)
+                            Text(fault, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Surface(shape = RoundedCornerShape(18.dp), color = StatusLowStock.copy(alpha = 0.2f)) {
+                                Text("×$count",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = StatusLowStock, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -468,10 +551,7 @@ fun ClientDetailScreen(
             }
 
             // ── Equipos ────────────────────────────────────────────────────────
-            item {
-                Text("Equipos (${equipment.size})", fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleSmall)
-            }
+            item { SectionHeader("Equipos (${equipment.size})") }
             if (equipment.isEmpty()) {
                 item {
                     Text("Sin equipos registrados.", style = MaterialTheme.typography.bodySmall,
@@ -479,13 +559,18 @@ fun ClientDetailScreen(
                 }
             }
             items(equipment) { eq ->
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
-                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Air, null, tint = Primary80)
                         Column {
-                            Text("${eq.brand} ${eq.model}".trim(), fontWeight = FontWeight.Medium,
-                                style = MaterialTheme.typography.bodyMedium)
+                            Text("${eq.brand} ${eq.model}".trim(),
+                                fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
                             if (eq.serial.isNotBlank())
                                 Text("Serie: ${eq.serial}", style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -495,10 +580,7 @@ fun ClientDetailScreen(
             }
 
             // ── Historial de Servicios ─────────────────────────────────────────
-            item {
-                Text("Historial de Servicios (${services.size})", fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleSmall)
-            }
+            item { SectionHeader("Historial de servicios (${services.size})") }
             if (services.isEmpty()) {
                 item {
                     Text("Sin servicios registrados.", style = MaterialTheme.typography.bodySmall,
@@ -508,10 +590,7 @@ fun ClientDetailScreen(
             items(services) { svc -> ServiceHistoryCard(svc, sdfShort) }
 
             // ── Citas ──────────────────────────────────────────────────────────
-            item {
-                Text("Citas (${appointments.size})", fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleSmall)
-            }
+            item { SectionHeader("Citas (${appointments.size})") }
             if (appointments.isEmpty()) {
                 item {
                     Text("Sin citas registradas.", style = MaterialTheme.typography.bodySmall,
@@ -521,10 +600,7 @@ fun ClientDetailScreen(
             items(appointments) { appt -> AppointmentHistoryCard(appt, sdf) }
 
             // ── Facturas ───────────────────────────────────────────────────────
-            item {
-                Text("Facturas (${invoices.size})", fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleSmall)
-            }
+            item { SectionHeader("Facturas (${invoices.size})") }
             if (invoices.isEmpty()) {
                 item {
                     Text("Sin facturas generadas.", style = MaterialTheme.typography.bodySmall,
@@ -555,15 +631,19 @@ fun ClientDetailScreen(
     }
 }
 
+// ─── Tarjeta historial servicio ───────────────────────────────────────────────
 @Composable
 private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
     val (statusColor, statusLabel) = when (svc.status) {
-        ServiceStatus.PENDING     -> StatusPending    to "Pendiente"
-        ServiceStatus.IN_PROGRESS -> StatusInRepair   to "En Proceso"
-        ServiceStatus.COMPLETED   -> StatusCompleted  to "Completado"
+        ServiceStatus.PENDING     -> StatusPending   to "Pendiente"
+        ServiceStatus.IN_PROGRESS -> StatusInRepair  to "En Proceso"
+        ServiceStatus.COMPLETED   -> StatusCompleted to "Completado"
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -577,8 +657,8 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Tipo: ${when(svc.type) {
-                    ServiceType.MAINTENANCE -> "Mantenimiento"
-                    ServiceType.REPAIR -> "Reparación"
+                    ServiceType.MAINTENANCE  -> "Mantenimiento"
+                    ServiceType.REPAIR       -> "Reparación"
                     ServiceType.INSTALLATION -> "Instalación"
                 }}", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -602,8 +682,10 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
             }
             svc.warrantyExpiresAt?.let { expiresAt ->
                 val vigente = expiresAt > System.currentTimeMillis()
-                Surface(shape = RoundedCornerShape(6.dp),
-                    color = (if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.15f)) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = (if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.15f)
+                ) {
                     Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically) {
@@ -623,16 +705,20 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
     }
 }
 
+// ─── Tarjeta historial cita ───────────────────────────────────────────────────
 @Composable
 private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat) {
     val (statusColor, statusLabel) = when (appt.status) {
-        AppointmentStatus.SCHEDULED   -> StatusPending    to "Programada"
-        AppointmentStatus.IN_PROGRESS -> StatusInRepair   to "En Proceso"
-        AppointmentStatus.COMPLETED   -> StatusCompleted  to "Completada"
-        AppointmentStatus.CANCELLED   -> Color(0xFFB71C1C) to "Cancelada"
+        AppointmentStatus.SCHEDULED   -> StatusPending         to "Programada"
+        AppointmentStatus.IN_PROGRESS -> StatusInRepair        to "En Proceso"
+        AppointmentStatus.COMPLETED   -> StatusCompleted       to "Completada"
+        AppointmentStatus.CANCELLED   -> Color(0xFFB71C1C)     to "Cancelada"
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -646,8 +732,8 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Tipo: ${when(appt.serviceType) {
-                    ServiceType.MAINTENANCE -> "Mantenimiento"
-                    ServiceType.REPAIR -> "Reparación"
+                    ServiceType.MAINTENANCE  -> "Mantenimiento"
+                    ServiceType.REPAIR       -> "Reparación"
                     ServiceType.INSTALLATION -> "Instalación"
                 }}", style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -659,6 +745,7 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat) {
     }
 }
 
+// ─── Tarjeta historial factura ────────────────────────────────────────────────
 @Composable
 private fun InvoiceHistoryCard(inv: Invoice, sdf: SimpleDateFormat, isLoadingPdf: Boolean, onViewPdf: () -> Unit) {
     val (pColor, pLabel) = when (inv.paymentStatus) {
@@ -666,8 +753,11 @@ private fun InvoiceHistoryCard(inv: Invoice, sdf: SimpleDateFormat, isLoadingPdf
         com.gestion.itinerario.data.entity.PaymentStatus.PENDING -> Color(0xFFE65100) to "Pendiente"
         else -> MaterialTheme.colorScheme.onSurfaceVariant to "Sin estado"
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -714,22 +804,16 @@ fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String)
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Formulario de cliente con validaciones completas
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Formulario de cliente ────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -> Unit) {
-    val isJuridica = initial?.clientType == "Persona Jurídica"
-
-    var name       by remember { mutableStateOf(initial?.name ?: "") }
-    var lastName   by remember { mutableStateOf(initial?.lastName ?: "") }
-    var phoneCode  by remember { mutableStateOf(
-        // Al editar: extraer código del teléfono guardado
+    var name        by remember { mutableStateOf(initial?.name ?: "") }
+    var lastName    by remember { mutableStateOf(initial?.lastName ?: "") }
+    var phoneCode   by remember { mutableStateOf(
         PHONE_CODES.firstOrNull { initial?.phone?.startsWith(it) == true } ?: PHONE_CODES[0]
     ) }
     var phoneNumber by remember { mutableStateOf(
-        // Al editar: extraer los 7 dígitos sin el código
         initial?.phone?.let { full ->
             val code = PHONE_CODES.firstOrNull { full.startsWith(it) }
             if (code != null) full.removePrefix(code).trimStart('-') else full
@@ -739,18 +823,11 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
     var address    by remember { mutableStateOf(initial?.address ?: "") }
     var notes      by remember { mutableStateOf(initial?.notes ?: "") }
     var clientType by remember { mutableStateOf(initial?.clientType ?: "Persona Natural") }
-
-    // Estado del dropdown de código de área
     var codeDropdownExpanded by remember { mutableStateOf(false) }
-
-    // Mensaje de error de validación
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val isJuridicaMode = clientType == "Persona Jurídica"
 
-    // ── Condición habilitación del botón Guardar ──────────────────────────────
-    // Natural: nombre + apellido + teléfono (7 dígitos) + dirección requeridos
-    // Jurídica: nombre empresa + teléfono (7 dígitos) + dirección requeridos
     val saveEnabled = if (isJuridicaMode) {
         name.isNotBlank() && phoneNumber.length == 7 && address.isNotBlank()
     } else {
@@ -763,9 +840,7 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
             icon  = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("Error de validación", fontWeight = FontWeight.Bold) },
             text  = { Text(errorMessage!!) },
-            confirmButton = {
-                TextButton(onClick = { errorMessage = null }) { Text("Entendido") }
-            }
+            confirmButton = { TextButton(onClick = { errorMessage = null }) { Text("Entendido") } }
         )
     }
 
@@ -780,95 +855,64 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // ── Tipo de cliente ──────────────────────────────────────────
                 Text("Tipo de cliente:", style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CLIENT_TYPES.forEach { tipo ->
                         FilterChip(
                             selected = clientType == tipo,
-                            onClick  = {
-                                clientType = tipo
-                                // Al cambiar a jurídica limpiar apellido
-                                if (tipo == "Persona Jurídica") lastName = ""
-                            },
+                            onClick  = { clientType = tipo; if (tipo == "Persona Jurídica") lastName = "" },
                             label    = { Text(tipo, style = MaterialTheme.typography.labelSmall) },
                             modifier = Modifier.weight(1f),
-                            leadingIcon = if (clientType == tipo) {{
-                                Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                            }} else null
+                            leadingIcon = if (clientType == tipo) {{ Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }} else null
                         )
                     }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
 
-                // ── Nombre (condicional por tipo de cliente) ─────────────────
                 if (isJuridicaMode) {
-                    // Persona Jurídica: un solo campo a todo el ancho, sin restricciones
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
+                        value = name, onValueChange = { name = it },
                         label = { Text("Nombre de la empresa *") },
                         placeholder = { Text("Nombre de la empresa") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
                         leadingIcon = { Icon(Icons.Default.Business, null) }
                     )
                 } else {
-                    // Persona Natural: dos campos en fila — Nombre y Apellido
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = name,
-                            onValueChange = { v ->
-                                // Solo letras, espacios y caracteres especiales (sin dígitos)
-                                if (!v.any { it.isDigit() }) name = v
-                            },
+                            onValueChange = { v -> if (!v.any { it.isDigit() }) name = v },
                             label = { Text("Nombre *") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
+                            modifier = Modifier.weight(1f), singleLine = true
                         )
                         OutlinedTextField(
                             value = lastName,
-                            onValueChange = { v ->
-                                if (!v.any { it.isDigit() }) lastName = v
-                            },
+                            onValueChange = { v -> if (!v.any { it.isDigit() }) lastName = v },
                             label = { Text("Apellido *") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
+                            modifier = Modifier.weight(1f), singleLine = true
                         )
                     }
-                    // Hint sutil para el usuario
-                    Text(
-                        "El nombre y apellido no pueden contener números",
+                    Text("El nombre y apellido no pueden contener números",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                 }
 
-                // ── Teléfono: dropdown de código + 7 dígitos ─────────────────
                 Text("Teléfono *", style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Dropdown código de área
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
                     ExposedDropdownMenuBox(
                         expanded = codeDropdownExpanded,
                         onExpandedChange = { codeDropdownExpanded = !codeDropdownExpanded },
                         modifier = Modifier.width(120.dp)
                     ) {
                         OutlinedTextField(
-                            value = phoneCode,
-                            onValueChange = {},
-                            readOnly = true,
+                            value = phoneCode, onValueChange = {}, readOnly = true,
                             label = { Text("Código") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = codeDropdownExpanded)
-                            },
-                            modifier = Modifier.menuAnchor(),
-                            singleLine = true
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = codeDropdownExpanded) },
+                            modifier = Modifier.menuAnchor(), singleLine = true
                         )
                         ExposedDropdownMenu(
                             expanded = codeDropdownExpanded,
@@ -877,27 +921,17 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
                             PHONE_CODES.forEach { code ->
                                 DropdownMenuItem(
                                     text = { Text(code) },
-                                    onClick = {
-                                        phoneCode = code
-                                        codeDropdownExpanded = false
-                                    }
+                                    onClick = { phoneCode = code; codeDropdownExpanded = false }
                                 )
                             }
                         }
                     }
-
-                    // Campo de 7 dígitos numéricos
                     OutlinedTextField(
                         value = phoneNumber,
-                        onValueChange = { v ->
-                            // Solo dígitos, máximo 7
-                            val digits = v.filter { it.isDigit() }
-                            if (digits.length <= 7) phoneNumber = digits
-                        },
+                        onValueChange = { v -> val d = v.filter { it.isDigit() }; if (d.length <= 7) phoneNumber = d },
                         label = { Text("7 dígitos") },
                         placeholder = { Text("1234567") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
+                        modifier = Modifier.weight(1f), singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         isError = phoneNumber.isNotEmpty() && phoneNumber.length < 7,
                         supportingText = {
@@ -909,7 +943,6 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
                     )
                 }
 
-                // ── Correo y Dirección (sin restricciones) ───────────────────
                 OutlinedTextField(
                     value = email, onValueChange = { email = it },
                     label = { Text("Correo electrónico") },
@@ -932,21 +965,11 @@ fun ClientFormDialog(initial: Client?, onDismiss: () -> Unit, onSave: (Client) -
         confirmButton = {
             Button(
                 onClick = {
-                    // ── Validaciones al guardar ───────────────────────────────
                     if (!isJuridicaMode) {
-                        if (name.any { it.isDigit() }) {
-                            errorMessage = "El nombre no puede contener números."
-                            return@Button
-                        }
-                        if (lastName.any { it.isDigit() }) {
-                            errorMessage = "El apellido no puede contener números."
-                            return@Button
-                        }
+                        if (name.any { it.isDigit() }) { errorMessage = "El nombre no puede contener números."; return@Button }
+                        if (lastName.any { it.isDigit() }) { errorMessage = "El apellido no puede contener números."; return@Button }
                     }
-                    if (phoneNumber.length != 7) {
-                        errorMessage = "El número de teléfono debe tener exactamente 7 dígitos."
-                        return@Button
-                    }
+                    if (phoneNumber.length != 7) { errorMessage = "El número de teléfono debe tener exactamente 7 dígitos."; return@Button }
                     val fullPhone = "$phoneCode$phoneNumber"
                     onSave(Client(
                         name       = name.trim(),
