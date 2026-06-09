@@ -108,10 +108,25 @@ fun ServicesScreen(
         )
     }
 
+    // ── Métricas semanales ────────────────────────────────────────────────────
+    val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
+    val weeklyCompleted = orders.count { it.status == ServiceStatus.COMPLETED && (it.completedAt ?: 0L) >= weekAgo }
+    val weeklyTotal = orders.count { it.createdAt >= weekAgo }
+    val efficiency = if (weeklyTotal > 0) weeklyCompleted * 100 / weeklyTotal else 100
+
+    // ── Citas de hoy ─────────────────────────────────────────────────────────
+    val todayStart = remember {
+        java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val todayCount = filteredAppointments.count { it.dateTime >= todayStart && it.dateTime < todayStart + 86_400_000L }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Órdenes de Servicio", fontWeight = FontWeight.Bold) },
+                title = { Text("Servicios", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { showQuotes = true }) {
                         Icon(Icons.Default.RequestQuote, contentDescription = "Cotizaciones")
@@ -125,23 +140,21 @@ fun ServicesScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(
-            top    = padding.calculateTopPadding(),
-            bottom = innerPadding.calculateBottomPadding()
-        )) {
-            // Filter chips
+        Column(
+            modifier = Modifier
+                .padding(top = padding.calculateTopPadding())
+                .fillMaxSize()
+        ) {
+            // ── Tabs de filtro personalizados ─────────────────────────────
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterChip(selected = filterStatus == null, onClick = { filterStatus = null }, label = { Text("Todos") })
-                ServiceStatus.values().forEach { s ->
-                    FilterChip(
-                        selected = filterStatus == s,
-                        onClick  = { filterStatus = if (filterStatus == s) null else s },
-                        label    = { Text(s.displayName()) }
-                    )
-                }
+                ServiceFilterTab("Todos", selected = filterStatus == null) { filterStatus = null }
+                ServiceFilterTab("Pendiente", selected = filterStatus == ServiceStatus.PENDING) { filterStatus = ServiceStatus.PENDING }
+                ServiceFilterTab("En Proceso", selected = filterStatus == ServiceStatus.IN_PROGRESS) { filterStatus = ServiceStatus.IN_PROGRESS }
             }
 
             val noOrders       = filteredOrders.isEmpty()
@@ -149,7 +162,8 @@ fun ServicesScreen(
 
             if (noOrders && noAppointments) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Engineering, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(64.dp))
@@ -159,24 +173,102 @@ fun ServicesScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp, end = 16.dp,
+                        top = 4.dp,
+                        bottom = innerPadding.calculateBottomPadding() + 88.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // ── Sección: Órdenes de Servicio ─────────────────────────
+                    // ── Citas Programadas ─────────────────────────────────
+                    if (filteredAppointments.isNotEmpty()) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Citas Programadas",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (todayCount > 0) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Primary40
+                                    ) {
+                                        Text(
+                                            "$todayCount Hoy",
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        items(filteredAppointments, key = { "appt_${it.id}" }) { appt ->
+                            val cn = clientFullName(appt.clientId).let {
+                                if (it == "Cliente" && appt.notes.isNotBlank())
+                                    appt.notes.substringBefore(" —").ifBlank { it } else it
+                            }
+                            ScheduledAppointmentCard(
+                                appointment   = appt,
+                                clientName    = cn,
+                                onViewDetails = { detailAppointment = appt },
+                                onEdit        = { editAppointment = appt; showAppointmentDialog = true },
+                                onStart       = { viewModel.startAppointment(appt) },
+                                onComplete    = {
+                                    viewModel.completeAppointment(appt)
+                                    invoiceAppointment = appt
+                                },
+                                onCancel      = {
+                                    confirmTitle   = "Cancelar cita"
+                                    confirmMessage = "¿Estás segura de que deseas cancelar esta cita?"
+                                    confirmAction  = { viewModel.cancelAppointment(appt) }
+                                }
+                            )
+                        }
+                    }
+
+                    // ── Órdenes de Servicio ───────────────────────────────
                     if (filteredOrders.isNotEmpty()) {
                         item {
-                            SectionHeader(
-                                icon  = Icons.Default.Build,
-                                title = "Órdenes de Servicio",
-                                count = filteredOrders.size
-                            )
+                            if (filteredAppointments.isNotEmpty()) Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Órdenes de Servicio",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Secondary40.copy(alpha = 0.12f)
+                                ) {
+                                    Text(
+                                        "${filteredOrders.size}",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Secondary40
+                                    )
+                                }
+                            }
                         }
                         items(filteredOrders, key = { "order_${it.id}" }) { order ->
                             ServiceOrderCard(order,
                                 onEdit   = { editOrder = order; showDialog = true },
                                 onDelete = {
                                     confirmTitle   = "Eliminar orden"
-                                    confirmMessage = "¿Estás segura de que deseas eliminar esta orden de servicio? Esta acción no se puede deshacer."
+                                    confirmMessage = "¿Estás segura de que deseas eliminar esta orden? Esta acción no se puede deshacer."
                                     confirmAction  = { viewModel.delete(order) }
                                 },
                                 onStatusChange = { newStatus ->
@@ -188,34 +280,38 @@ fun ServicesScreen(
                         }
                     }
 
-                    // ── Sección: Citas Programadas ───────────────────────────
-                    if (filteredAppointments.isNotEmpty()) {
-                        item {
-                            if (filteredOrders.isNotEmpty()) Spacer(Modifier.height(4.dp))
-                            SectionHeader(
-                                icon  = Icons.Default.EventAvailable,
-                                title = "Citas Programadas",
-                                count = filteredAppointments.size
+                    // ── Métricas Semanales ────────────────────────────────
+                    item { Spacer(Modifier.height(8.dp)) }
+                    item {
+                        Text(
+                            "Métricas Semanales",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            ServiceMetricTile(
+                                modifier  = Modifier.weight(1f),
+                                value     = "$weeklyCompleted",
+                                label     = "COMPLETADOS",
+                                icon      = Icons.Default.CheckCircle,
+                                gradient  = Brush.linearGradient(listOf(Primary40, Color(0xFF5B21B6)))
                             )
-                        }
-                        items(filteredAppointments, key = { "appt_${it.id}" }) { appt ->
-                            ScheduledAppointmentCard(
-                                appointment = appt,
-                                onViewDetails = { detailAppointment = appt },
-                                onEdit      = { editAppointment = appt; showAppointmentDialog = true },
-                                onStart     = { viewModel.startAppointment(appt) },
-                                onComplete  = {
-                                    viewModel.completeAppointment(appt)
-                                    invoiceAppointment = appt
-                                },
-                                onCancel    = {
-                                    confirmTitle   = "Cancelar cita"
-                                    confirmMessage = "¿Estás segura de que deseas cancelar esta cita? Esta acción no se puede deshacer."
-                                    confirmAction  = { viewModel.cancelAppointment(appt) }
-                                }
+                            ServiceMetricTile(
+                                modifier  = Modifier.weight(1f),
+                                value     = "$efficiency%",
+                                label     = "EFICIENCIA",
+                                icon      = Icons.Default.TrendingUp,
+                                gradient  = Brush.linearGradient(listOf(Secondary40, Color(0xFF9D174D)))
                             )
                         }
                     }
+                    item { Spacer(Modifier.height(8.dp)) }
                 }
             }
         }
@@ -433,142 +529,285 @@ fun SectionHeader(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(vertical = 4.dp)
     ) {
-        Icon(icon, null, tint = Primary80, modifier = Modifier.size(18.dp))
-        Text(title, fontWeight = FontWeight.SemiBold,
+        Icon(icon, null, tint = Primary40, modifier = Modifier.size(18.dp))
+        Text(title, fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onBackground)
-        Surface(shape = RoundedCornerShape(10.dp), color = Primary80.copy(alpha = 0.12f)) {
+        Surface(shape = RoundedCornerShape(10.dp), color = Primary40.copy(alpha = 0.12f)) {
             Text("$count", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall, color = Primary80)
+                style = MaterialTheme.typography.labelSmall, color = Primary40,
+                fontWeight = FontWeight.Bold)
         }
     }
 }
 
-// ─── Tarjeta de cita programada (con ciclo SCHEDULED → IN_PROGRESS → COMPLETED) ──
+// ─── Tab de filtro personalizado ─────────────────────────────────────────────
+@Composable
+private fun ServiceFilterTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = Color.Transparent,
+        border = if (selected) null else androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .then(
+                    if (selected) Modifier.background(
+                        Brush.linearGradient(listOf(Primary40, Secondary40)),
+                        RoundedCornerShape(50)
+                    ) else Modifier
+                )
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// ─── Tile de métrica semanal ──────────────────────────────────────────────────
+@Composable
+private fun ServiceMetricTile(
+    modifier: Modifier,
+    value: String,
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    gradient: Brush
+) {
+    Box(
+        modifier = modifier
+            .height(96.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(gradient)
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Icon(icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(22.dp))
+            Column {
+                Text(value,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White)
+                Text(label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.8f),
+                    letterSpacing = 0.5.sp)
+            }
+        }
+    }
+}
+
+// ─── Tarjeta de cita programada ───────────────────────────────────────────────
 @Composable
 fun ScheduledAppointmentCard(
     appointment: Appointment,
+    clientName: String,
     onViewDetails: () -> Unit = {},
     onEdit: () -> Unit,
     onStart: () -> Unit,
     onComplete: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    val isMantenimiento = appointment.serviceType == ServiceType.MAINTENANCE
-    val accentColor = if (isMantenimiento) Color(0xFF2E7D32) else Color(0xFF1565C0)
-    val tipoLabel = when (appointment.serviceType) {
-        ServiceType.MAINTENANCE  -> "Mantenimiento"
-        ServiceType.REPAIR       -> "Reparación"
-        ServiceType.INSTALLATION -> "Instalación"
+    val sdfDate = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val sdfTime = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
+    val tipoLabel = appointment.serviceType.displayName()
+
+    val isDark = appointment.status == AppointmentStatus.IN_PROGRESS
+    val cardBg = if (isDark) DarkBackground else Color.White
+    val textColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val subtextColor = if (isDark) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+
+    val (statusColor, statusLabel) = when (appointment.status) {
+        AppointmentStatus.SCHEDULED   -> StatusPending   to "PROGRAMADA"
+        AppointmentStatus.IN_PROGRESS -> StatusInRepair  to "EN PROCESO"
+        AppointmentStatus.COMPLETED   -> StatusCompleted to "COMPLETADA"
+        AppointmentStatus.CANCELLED   -> StatusLowStock  to "CANCELADA"
     }
-    val clientName = appointment.notes.substringBefore(" —").ifBlank { appointment.notes }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(18.dp),
-        colors   = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        shape    = RoundedCornerShape(16.dp),
+        colors   = CardDefaults.cardColors(containerColor = cardBg)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Cabecera
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // Borde izquierdo degradado
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.verticalGradient(listOf(Primary40, Secondary40)),
+                        RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                    )
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    if (isMantenimiento) Icons.Default.Build else Icons.Default.EventAvailable,
-                    null, tint = accentColor, modifier = Modifier.size(18.dp)
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(clientName, fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface)
-                    Text(sdf.format(Date(appointment.dateTime)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    // Tipo de equipo (si fue especificado)
-                    if (appointment.equipmentType.isNotBlank()) {
-                        Text("🔧 ${appointment.equipmentType}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Surface(shape = RoundedCornerShape(8.dp), color = accentColor.copy(alpha = 0.15f)) {
-                    Text(tipoLabel,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = accentColor)
-                }
-            }
-
-            // Badge de estado
-            val (statusLabel, statusColor) = when (appointment.status) {
-                AppointmentStatus.SCHEDULED   -> "Programada" to StatusPending
-                AppointmentStatus.IN_PROGRESS -> "En Proceso" to StatusInRepair
-                else                          -> "Programada" to StatusPending
-            }
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = statusColor.copy(alpha = 0.12f),
-                modifier = Modifier.padding(top = 6.dp)
-            ) {
-                Text(statusLabel,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = statusColor)
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Botones según el estado actual del ciclo
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (appointment.status) {
-                    AppointmentStatus.SCHEDULED -> {
-                        // Pendiente → En Proceso
-                        OutlinedButton(
-                            onClick = onStart,
-                            modifier = Modifier.height(30.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp)
-                        ) {
-                            Text("→ En Proceso", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    AppointmentStatus.IN_PROGRESS -> {
-                        // En Proceso → Completar
-                        OutlinedButton(
-                            onClick = onComplete,
-                            modifier = Modifier.height(30.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusCompleted)
-                        ) {
-                            Text("✓ Completar", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    else -> {}
-                }
-                if (appointment.status != AppointmentStatus.COMPLETED && appointment.status != AppointmentStatus.CANCELLED) {
-                    OutlinedButton(
-                        onClick = onCancel,
-                        modifier = Modifier.height(30.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusLowStock)
-                    ) {
-                        Text("✕ Cancelar", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                TextButton(
-                    onClick = onViewDetails,
-                    modifier = Modifier.height(30.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
+                // Nombre + estado
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Ver detalles", style = MaterialTheme.typography.labelSmall)
-                    Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(14.dp))
-                }
-                if (appointment.status != AppointmentStatus.COMPLETED && appointment.status != AppointmentStatus.CANCELLED) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
-                        Icon(Icons.Default.Edit, null, tint = Primary80, modifier = Modifier.size(16.dp))
+                    Text(
+                        clientName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = statusColor.copy(alpha = if (isDark) 0.22f else 0.12f)
+                    ) {
+                        Text(
+                            statusLabel,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
                     }
+                }
+                // Tipo de servicio
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.Default.Build, null,
+                        tint = subtextColor, modifier = Modifier.size(13.dp))
+                    Text(tipoLabel, style = MaterialTheme.typography.bodySmall, color = subtextColor)
+                }
+                // Equipo (si hay)
+                if (appointment.equipmentType.isNotBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Settings, null,
+                            tint = subtextColor, modifier = Modifier.size(13.dp))
+                        Text(appointment.equipmentType,
+                            style = MaterialTheme.typography.bodySmall, color = subtextColor)
+                    }
+                }
+                // Fecha y hora
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, null,
+                            tint = subtextColor, modifier = Modifier.size(13.dp))
+                        Text(sdfDate.format(Date(appointment.dateTime)),
+                            style = MaterialTheme.typography.bodySmall, color = subtextColor)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Default.Schedule, null,
+                            tint = subtextColor, modifier = Modifier.size(13.dp))
+                        Text(sdfTime.format(Date(appointment.dateTime)),
+                            style = MaterialTheme.typography.bodySmall, color = subtextColor)
+                    }
+                }
+                // Botones de acción
+                if (appointment.status != AppointmentStatus.COMPLETED &&
+                    appointment.status != AppointmentStatus.CANCELLED) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        when (appointment.status) {
+                            AppointmentStatus.SCHEDULED -> {
+                                Button(
+                                    onClick = onStart,
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Primary40),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("EN PROCESO",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            AppointmentStatus.IN_PROGRESS -> {
+                                Button(
+                                    onClick = onComplete,
+                                    modifier = Modifier.weight(1f).height(38.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = StatusCompleted),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("COMPLETAR",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            else -> {}
+                        }
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp, if (isDark) Color.White.copy(0.3f) else MaterialTheme.colorScheme.outline.copy(0.4f)
+                            ),
+                            contentPadding = PaddingValues(0.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Text("CANCELAR",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                // Ver detalles link (small)
+                if (appointment.status != AppointmentStatus.CANCELLED) {
+                    TextButton(
+                        onClick = onViewDetails,
+                        modifier = Modifier.align(Alignment.End).height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Text("Ver detalles",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.ArrowForward, null,
+                            modifier = Modifier.size(12.dp),
+                            tint = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+            // Botón editar (top right)
+            if (appointment.status != AppointmentStatus.COMPLETED && appointment.status != AppointmentStatus.CANCELLED) {
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.align(Alignment.Top).padding(top = 6.dp, end = 4.dp).size(32.dp)
+                ) {
+                    Icon(Icons.Default.Edit, null,
+                        tint = if (isDark) Color.White.copy(0.7f) else Primary40,
+                        modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -607,7 +846,7 @@ fun ServiceOrderCard(
     val statusColor = order.status.color()
 
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+        colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Build, null, tint = Primary80, modifier = Modifier.size(20.dp))
