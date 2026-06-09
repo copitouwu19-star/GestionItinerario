@@ -28,8 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.gestion.itinerario.data.entity.Appointment
-import com.gestion.itinerario.data.entity.AppointmentStatus
 import com.gestion.itinerario.data.entity.Client
 import com.gestion.itinerario.data.entity.Invoice
 import com.gestion.itinerario.data.entity.ServiceOrder
@@ -332,27 +330,18 @@ fun ClientDetailScreen(
     invoiceViewModel: com.gestion.itinerario.ui.invoice.InvoiceViewModel = hiltViewModel(),
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
-    val context      = LocalContext.current
-    val equipment    by viewModel.getEquipmentForClient(client.id).collectAsState(initial = emptyList())
-    val services     by viewModel.getServicesForClient(client.id).collectAsState(initial = emptyList())
-    val appointments by viewModel.getAppointmentsForClient(client.id).collectAsState(initial = emptyList())
-    val invoices     by viewModel.getInvoicesForClient(client.id).collectAsState(initial = emptyList())
+    val context        = LocalContext.current
+    val equipment      by viewModel.getEquipmentForClient(client.id).collectAsState(initial = emptyList())
+    val services       by viewModel.getServicesForClient(client.id).collectAsState(initial = emptyList())
+    val invoices       by viewModel.getInvoicesForClient(client.id).collectAsState(initial = emptyList())
     val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
     val pdfScope = rememberCoroutineScope()
     var generatingInvoiceId by remember { mutableStateOf<String?>(null) }
-    var showWhatsAppMenu by remember { mutableStateOf(false) }
+    var showMoreMenu        by remember { mutableStateOf(false) }
 
-    val sdf      = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
-    val sdfShort = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 
-    val recurringFaults = remember(services) {
-        services.filter { it.description.isNotBlank() }
-            .groupBy { it.description.lowercase().trim() }
-            .filter { it.value.size > 1 }
-            .map { (_, list) -> Pair(list.first().description, list.size) }
-            .sortedByDescending { it.second }
-            .take(5)
-    }
+    val accentColors = listOf(Primary40, Secondary40, Tertiary40)
 
     Scaffold(
         topBar = {
@@ -365,7 +354,7 @@ fun ClientDetailScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "${services.size} servicio(s) · ${equipment.size} equipo(s)",
+                            "${services.size} SERVICIOS · ${equipment.size} EQUIPOS",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -373,51 +362,24 @@ fun ClientDetailScreen(
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) } },
                 actions = {
-                    if (client.phone.isNotBlank()) {
-                        Box {
-                            IconButton(onClick = { showWhatsAppMenu = true }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_whatsapp),
-                                    contentDescription = "WhatsApp", tint = WhatsAppGreen
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, null)
+                        }
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            if (client.phone.isNotBlank()) {
+                                DropdownMenuItem(
+                                    text = { Text("Abrir WhatsApp") },
+                                    leadingIcon = {
+                                        Icon(painter = painterResource(R.drawable.ic_whatsapp),
+                                            contentDescription = null, tint = WhatsAppGreen,
+                                            modifier = Modifier.size(18.dp))
+                                    },
+                                    onClick = { showMoreMenu = false; openWhatsApp(context, client.phone) }
                                 )
-                            }
-                            DropdownMenu(
-                                expanded = showWhatsAppMenu,
-                                onDismissRequest = { showWhatsAppMenu = false }
-                            ) {
-                                Text("WhatsApp rápido",
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                HorizontalDivider()
-                                listOf(
-                                    "Voy en camino, nos vemos pronto.",
-                                    "Confirmando nuestra cita. Estaré puntual.",
-                                    "Su servicio ha sido completado satisfactoriamente. Gracias por su preferencia.",
-                                    "Le recuerdo que tiene un mantenimiento programado próximamente.",
-                                    ""
-                                ).forEach { msg ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                if (msg.isEmpty()) "Escribir mensaje..." else msg,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                maxLines = 2
-                                            )
-                                        },
-                                        leadingIcon = {
-                                            if (msg.isEmpty()) {
-                                                Icon(Icons.Default.Edit, null, tint = WhatsAppGreen,
-                                                    modifier = Modifier.size(16.dp))
-                                            } else {
-                                                Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                                                    contentDescription = null, tint = WhatsAppGreen,
-                                                    modifier = Modifier.size(16.dp))
-                                            }
-                                        },
-                                        onClick = { showWhatsAppMenu = false; openWhatsApp(context, client.phone, msg) }
-                                    )
-                                }
                             }
                         }
                     }
@@ -427,10 +389,10 @@ fun ClientDetailScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Banner del cliente (estilo referencia) ─────────────────────────
+            // ── Tarjeta de información del cliente ────────────────────────────
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -438,57 +400,50 @@ fun ClientDetailScreen(
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                        // Borde izquierdo degradado morado→rosa como en la referencia
                         Box(
                             modifier = Modifier
                                 .width(5.dp)
                                 .fillMaxHeight()
                                 .background(
-                                    MaterialTheme.colorScheme.primary,
-                                    RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp)
+                                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                        listOf(Primary40, Secondary40)
+                                    ),
+                                    shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp)
                                 )
                         )
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(MaterialTheme.colorScheme.primary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    if (client.clientType == "Persona Jurídica") Icons.Default.Business
-                                    else Icons.Default.Person,
-                                    null, tint = Color.White, modifier = Modifier.size(28.dp)
-                                )
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    "${client.name}${if (client.lastName.isNotBlank()) " ${client.lastName}" else ""}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    client.clientType,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (client.phone.isNotBlank()) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(Icons.Default.Phone, null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(12.dp))
-                                        Text(client.phone,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                            Text(
+                                "INFORMACIÓN DEL CLIENTE",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 0.5.sp
+                            )
+                            InfoRow(Icons.Default.Person,      client.clientType)
+                            if (client.phone.isNotBlank())
+                                InfoRow(Icons.Default.Phone,       client.phone)
+                            if (client.address.isNotBlank())
+                                InfoRow(Icons.Default.LocationOn,  client.address)
+                            if (client.email.isNotBlank())
+                                InfoRow(Icons.Default.Email,       client.email)
+                            if (client.notes.isNotBlank())
+                                InfoRow(Icons.Default.StickyNote2, client.notes)
+                            if (client.phone.isNotBlank()) {
+                                Spacer(Modifier.height(2.dp))
+                                Button(
+                                    onClick = { openWhatsApp(context, client.phone) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
+                                    shape = RoundedCornerShape(50),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(painter = painterResource(R.drawable.ic_whatsapp),
+                                        contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Abrir en WhatsApp", fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -496,205 +451,226 @@ fun ClientDetailScreen(
                 }
             }
 
-            // ── Info del cliente ───────────────────────────────────────────────
+            // ── Estadísticas: Equipos + Facturas ──────────────────────────────
             item {
-                Card(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SectionHeader("Información del cliente")
-                        if (client.email.isNotBlank())   InfoRow(Icons.Default.Email, client.email)
-                        if (client.address.isNotBlank()) InfoRow(Icons.Default.LocationOn, client.address)
-                        if (client.notes.isNotBlank())   InfoRow(Icons.Default.Notes, client.notes)
-                        if (client.phone.isNotBlank()) {
-                            Spacer(Modifier.height(4.dp))
-                            Button(
-                                onClick = { openWhatsApp(context, client.phone) },
-                                colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(painter = painterResource(R.drawable.ic_whatsapp),
-                                    contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Abrir en WhatsApp")
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Fallas recurrentes ─────────────────────────────────────────────
-            if (recurringFaults.isNotEmpty()) {
-                item { SectionHeader("Fallas recurrentes") }
-                items(recurringFaults) { (fault, count) ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(containerColor = StatusLowStock.copy(alpha = 0.08f))
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Default.Warning, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))
-                            Text(fault, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                            Surface(shape = RoundedCornerShape(18.dp), color = StatusLowStock.copy(alpha = 0.2f)) {
-                                Text("×$count",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = StatusLowStock, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Equipos ────────────────────────────────────────────────────────
-            item { SectionHeader("Equipos (${equipment.size})") }
-            if (equipment.isEmpty()) {
-                item {
-                    Text("Sin equipos registrados.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            items(equipment) { eq ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    Row(modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Air, null, tint = Primary80)
-                        Column {
-                            Text("${eq.brand} ${eq.model}".trim(),
-                                fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                            if (eq.serial.isNotBlank())
-                                Text("Serie: ${eq.serial}", style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                    StatTileCard(
+                        modifier = Modifier.weight(1f),
+                        count = equipment.size,
+                        label = "EQUIPOS",
+                        accentColor = Primary40
+                    )
+                    StatTileCard(
+                        modifier = Modifier.weight(1f),
+                        count = invoices.size,
+                        label = "FACTURAS",
+                        accentColor = Secondary40
+                    )
                 }
             }
 
             // ── Historial de Servicios ─────────────────────────────────────────
-            item { SectionHeader("Historial de servicios (${services.size})") }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Historial de Servicios (${services.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
             if (services.isEmpty()) {
-                item {
-                    Text("Sin servicios registrados.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                item { EmptyState(icon = Icons.Default.BuildCircle, message = "Sin servicios registrados") }
+            } else {
+                itemsIndexed(services, key = { _, s -> s.id }) { index, svc ->
+                    ServiceHistoryCard(svc = svc, sdf = sdf, accentColor = accentColors[index % accentColors.size])
                 }
             }
-            items(services) { svc -> ServiceHistoryCard(svc, sdfShort) }
-
-            // ── Citas ──────────────────────────────────────────────────────────
-            item { SectionHeader("Citas (${appointments.size})") }
-            if (appointments.isEmpty()) {
-                item {
-                    Text("Sin citas registradas.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            items(appointments) { appt -> AppointmentHistoryCard(appt, sdf) }
 
             // ── Facturas ───────────────────────────────────────────────────────
-            item { SectionHeader("Facturas (${invoices.size})") }
             if (invoices.isEmpty()) {
+                item { EmptyState(icon = Icons.Default.Receipt, message = "Sin facturas generadas") }
+            } else {
                 item {
-                    Text("Sin facturas generadas.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Facturas (${invoices.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
-            }
-            items(invoices) { inv ->
-                InvoiceHistoryCard(
-                    inv = inv,
-                    sdf = sdf,
-                    isLoadingPdf = generatingInvoiceId == inv.id,
-                    onViewPdf = {
-                        generatingInvoiceId = inv.id
-                        pdfScope.launch {
-                            try {
-                                val file = invoiceViewModel.generatePdf(context, inv, companyProfile)
-                                com.gestion.itinerario.ui.invoice.InvoicePdfGenerator.openPdf(context, file)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                android.widget.Toast.makeText(context, "No se pudo generar el PDF. Intenta de nuevo.", android.widget.Toast.LENGTH_LONG).show()
+                itemsIndexed(invoices, key = { _, inv -> inv.id }) { index, inv ->
+                    InvoiceHistoryCard(
+                        inv = inv,
+                        sdf = sdf,
+                        accentColor = accentColors[index % accentColors.size],
+                        isLoadingPdf = generatingInvoiceId == inv.id,
+                        onViewPdf = {
+                            generatingInvoiceId = inv.id
+                            pdfScope.launch {
+                                try {
+                                    val file = invoiceViewModel.generatePdf(context, inv, companyProfile)
+                                    com.gestion.itinerario.ui.invoice.InvoicePdfGenerator.openPdf(context, file)
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    android.widget.Toast.makeText(context, "No se pudo generar el PDF.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                                generatingInvoiceId = null
                             }
-                            generatingInvoiceId = null
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
 }
 
+// ── Tile de estadística (Equipos / Facturas) ──────────────────────────────────
+@Composable
+private fun StatTileCard(modifier: Modifier, count: Int, label: String, accentColor: Color) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 0.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = accentColor
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(accentColor, RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp))
+            )
+        }
+    }
+}
+
+// ── Estado vacío ──────────────────────────────────────────────────────────────
+@Composable
+private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(icon, null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+            modifier = Modifier.size(40.dp))
+        Text(message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 // ─── Tarjeta historial servicio ───────────────────────────────────────────────
 @Composable
-private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
+private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentColor: Color = Primary40) {
     val (statusColor, statusLabel) = when (svc.status) {
-        ServiceStatus.PENDING     -> StatusPending   to "Pendiente"
-        ServiceStatus.IN_PROGRESS -> StatusInRepair  to "En Proceso"
-        ServiceStatus.COMPLETED   -> StatusCompleted to "Completado"
+        ServiceStatus.PENDING     -> StatusPending   to "PENDIENTE"
+        ServiceStatus.IN_PROGRESS -> StatusInRepair  to "EN PROCESO"
+        ServiceStatus.COMPLETED   -> StatusCompleted to "COMPLETADA"
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Build, null, tint = Primary80, modifier = Modifier.size(18.dp))
-                Text(svc.description, modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-                Surface(shape = RoundedCornerShape(6.dp), color = statusColor.copy(alpha = 0.15f)) {
-                    Text(statusLabel, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall, color = statusColor)
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Tipo: ${when(svc.type) {
-                    ServiceType.MAINTENANCE  -> "Mantenimiento"
-                    ServiceType.REPAIR       -> "Reparación"
-                    ServiceType.INSTALLATION -> "Instalación"
-                }}", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (svc.equipmentType.isNotBlank())
-                    Text("Equipo: ${svc.equipmentType}", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (svc.diagnosis.isNotBlank())
-                Text("Diagnóstico: ${svc.diagnosis}", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (svc.totalCost > 0.0)
-                Text("Costo: \$${String.format("%.2f", svc.totalCost)}",
-                    style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary)
-            Text("Creado: ${sdf.format(Date(svc.createdAt))}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            svc.completedAt?.let {
-                Text("Completado: ${sdf.format(Date(it))}", style = MaterialTheme.typography.labelSmall,
-                    color = StatusCompleted)
-            }
-            svc.warrantyExpiresAt?.let { expiresAt ->
-                val vigente = expiresAt > System.currentTimeMillis()
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = (if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.15f)
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor, RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+            )
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CalendarToday, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp))
+                    Text(
+                        sdf.format(Date(svc.createdAt)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = statusColor.copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            statusLabel,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
+                    }
+                }
+                Text(
+                    "Tipo: ${when(svc.type) {
+                        ServiceType.MAINTENANCE  -> "Mantenimiento"
+                        ServiceType.REPAIR       -> "Reparación"
+                        ServiceType.INSTALLATION -> "Instalación"
+                    }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (svc.equipmentType.isNotBlank())
+                    Text("Equipo: ${svc.equipmentType}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (svc.description.isNotBlank())
+                    Text(svc.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (svc.totalCost > 0.0)
+                    Text("\$${String.format("%.2f", svc.totalCost)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
+                svc.warrantyExpiresAt?.let { expiresAt ->
+                    val vigente = expiresAt > System.currentTimeMillis()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Icon(Icons.Default.VerifiedUser, null,
                             tint = if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(12.dp))
                         Text(
                             if (vigente) "En garantía hasta ${sdf.format(Date(expiresAt))}"
-                            else "Garantía vencida (${sdf.format(Date(expiresAt))})",
+                            else "Garantía vencida",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (vigente) StatusCompleted else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -705,91 +681,73 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat) {
     }
 }
 
-// ─── Tarjeta historial cita ───────────────────────────────────────────────────
-@Composable
-private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat) {
-    val (statusColor, statusLabel) = when (appt.status) {
-        AppointmentStatus.SCHEDULED   -> StatusPending         to "Programada"
-        AppointmentStatus.IN_PROGRESS -> StatusInRepair        to "En Proceso"
-        AppointmentStatus.COMPLETED   -> StatusCompleted       to "Completada"
-        AppointmentStatus.CANCELLED   -> Color(0xFFB71C1C)     to "Cancelada"
-    }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.CalendarToday, null, tint = Primary80, modifier = Modifier.size(18.dp))
-                Text(sdf.format(Date(appt.dateTime)), modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                Surface(shape = RoundedCornerShape(6.dp), color = statusColor.copy(alpha = 0.15f)) {
-                    Text(statusLabel, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall, color = statusColor)
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Tipo: ${when(appt.serviceType) {
-                    ServiceType.MAINTENANCE  -> "Mantenimiento"
-                    ServiceType.REPAIR       -> "Reparación"
-                    ServiceType.INSTALLATION -> "Instalación"
-                }}", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (appt.equipmentType.isNotBlank())
-                    Text("Equipo: ${appt.equipmentType}", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
 // ─── Tarjeta historial factura ────────────────────────────────────────────────
 @Composable
-private fun InvoiceHistoryCard(inv: Invoice, sdf: SimpleDateFormat, isLoadingPdf: Boolean, onViewPdf: () -> Unit) {
+private fun InvoiceHistoryCard(
+    inv: Invoice,
+    sdf: SimpleDateFormat,
+    accentColor: Color = Primary40,
+    isLoadingPdf: Boolean,
+    onViewPdf: () -> Unit
+) {
     val (pColor, pLabel) = when (inv.paymentStatus) {
-        com.gestion.itinerario.data.entity.PaymentStatus.PAID    -> StatusCompleted to "Pagado"
-        com.gestion.itinerario.data.entity.PaymentStatus.PENDING -> Color(0xFFE65100) to "Pendiente"
-        else -> MaterialTheme.colorScheme.onSurfaceVariant to "Sin estado"
+        com.gestion.itinerario.data.entity.PaymentStatus.PAID    -> StatusCompleted to "PAGADO"
+        com.gestion.itinerario.data.entity.PaymentStatus.PENDING -> Color(0xFFE65100) to "PENDIENTE"
+        else -> MaterialTheme.colorScheme.onSurfaceVariant to "SIN ESTADO"
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Receipt, null, tint = Primary80, modifier = Modifier.size(18.dp))
-                Text(inv.invoiceNumber, modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                Surface(shape = RoundedCornerShape(6.dp), color = pColor.copy(alpha = 0.15f)) {
-                    Text(pLabel, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall, color = pColor)
-                }
-            }
-            Text("\$${String.format("%.2f", inv.totalAmount)}",
-                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Primary80)
-            Text(sdf.format(java.util.Date(inv.createdAt)),
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (inv.equipmentType.isNotBlank())
-                Text("Equipo: ${inv.equipmentType}", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(2.dp))
-            OutlinedButton(
-                onClick = onViewPdf,
-                enabled = !isLoadingPdf,
-                modifier = Modifier.align(Alignment.End)
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor, RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+            )
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (isLoadingPdf) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Generando…", style = MaterialTheme.typography.labelSmall)
-                } else {
-                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(16.dp), tint = Primary80)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Ver PDF", style = MaterialTheme.typography.labelSmall)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Receipt, null, tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp))
+                    Text(inv.invoiceNumber, modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Surface(shape = RoundedCornerShape(6.dp), color = pColor.copy(alpha = 0.14f)) {
+                        Text(pLabel, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                            color = pColor)
+                    }
+                }
+                Text("\$${String.format("%.2f", inv.totalAmount)}",
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary)
+                Text(sdf.format(java.util.Date(inv.createdAt)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (inv.equipmentType.isNotBlank())
+                    Text("Equipo: ${inv.equipmentType}", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(2.dp))
+                OutlinedButton(
+                    onClick = onViewPdf, enabled = !isLoadingPdf,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    if (isLoadingPdf) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Generando…", style = MaterialTheme.typography.labelSmall)
+                    } else {
+                        Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(16.dp), tint = Primary80)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ver PDF", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }
