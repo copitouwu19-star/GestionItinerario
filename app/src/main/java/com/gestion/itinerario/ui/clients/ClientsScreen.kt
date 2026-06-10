@@ -70,6 +70,7 @@ private val PHONE_CODES  = listOf("0414", "0424", "0412", "0422", "0416", "0426"
 @Composable
 fun ClientsScreen(
     innerPadding: PaddingValues = PaddingValues(),
+    onNavigateToProfile: () -> Unit = {},
     viewModel: ClientViewModel = hiltViewModel()
 ) {
     val clients    by viewModel.clients.collectAsStateWithLifecycle()
@@ -105,7 +106,15 @@ fun ClientsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                TopAppBar(title = { Text("Clientes", fontWeight = FontWeight.Bold) })
+                TopAppBar(
+                    title = { Text("Clientes", fontWeight = FontWeight.Bold) },
+                    actions = {
+                        IconButton(onClick = onNavigateToProfile) {
+                            Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
+                                tint = Primary80, modifier = Modifier.size(28.dp))
+                        }
+                    }
+                )
             }
         ) { scaffoldPadding ->
             Column(
@@ -353,8 +362,8 @@ fun ClientDetailScreen(
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
     val context        = LocalContext.current
-    val services       by viewModel.getServicesForClient(client.id).collectAsState(initial = emptyList())
-    val appointments   by viewModel.getAppointmentsForClient(client.id).collectAsState(initial = emptyList())
+    val appointmentsRaw by viewModel.getAppointmentsForClient(client.id).collectAsState(initial = emptyList())
+    val appointments = remember(appointmentsRaw) { appointmentsRaw.sortedByDescending { it.dateTime } }
     val invoices       by viewModel.getInvoicesForClient(client).collectAsState(initial = emptyList())
     val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
     val pdfScope = rememberCoroutineScope()
@@ -376,7 +385,7 @@ fun ClientDetailScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "${services.size} SERVICIOS · ${appointments.size} CITAS · ${invoices.size} FACTURAS",
+                            "${appointments.size} SERVICIOS · ${invoices.size} FACTURAS",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -506,11 +515,11 @@ fun ClientDetailScreen(
                 }
             }
 
-            // ── Estadísticas: Servicios ────────────────────────────────────────
+            // ── Estadísticas: Servicios (= Citas) ─────────────────────────────
             item {
                 StatTileCard(
                     modifier = Modifier.fillMaxWidth(),
-                    count = services.size,
+                    count = appointments.size,
                     label = "SERVICIOS",
                     accentColor = Primary40
                 )
@@ -518,44 +527,15 @@ fun ClientDetailScreen(
 
             // ── Historial de Servicios ─────────────────────────────────────────
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Historial de Servicios (${services.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-            if (services.isEmpty()) {
-                item { EmptyState(icon = Icons.Default.BuildCircle, message = "Sin servicios registrados") }
-            } else {
-                itemsIndexed(services, key = { _, s -> s.id }) { index, svc ->
-                    ServiceHistoryCard(svc = svc, sdf = sdf, accentColor = accentColors[index % accentColors.size])
-                }
-            }
-
-            // ── Citas ─────────────────────────────────────────────────────────
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Citas (${appointments.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                Text(
+                    "Historial de Servicios (${appointments.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
             if (appointments.isEmpty()) {
-                item { EmptyState(icon = Icons.Default.CalendarToday, message = "Sin citas registradas") }
+                item { EmptyState(icon = Icons.Default.CalendarToday, message = "Sin servicios registrados") }
             } else {
                 itemsIndexed(appointments, key = { _, a -> a.id }) { index, appt ->
                     AppointmentHistoryCard(appt = appt, sdf = sdf, accentColor = accentColors[index % accentColors.size])

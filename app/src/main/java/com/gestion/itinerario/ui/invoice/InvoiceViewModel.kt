@@ -36,6 +36,9 @@ class InvoiceViewModel @Inject constructor(
     private val _savedInvoiceId = MutableStateFlow<String?>(null)
     val savedInvoiceId: StateFlow<String?> = _savedInvoiceId.asStateFlow()
 
+    private val _lastCreatedInvoice = MutableStateFlow<Invoice?>(null)
+    val lastCreatedInvoice: StateFlow<Invoice?> = _lastCreatedInvoice.asStateFlow()
+
     fun createInvoice(
         serviceOrderId: String = "",
         appointmentId: String = "",
@@ -43,6 +46,7 @@ class InvoiceViewModel @Inject constructor(
         clientName: String,
         clientPhone: String,
         clientAddress: String,
+        clientType: String = "Persona Natural",
         equipmentType: String,
         serviceDescription: String,
         diagnosis: String,
@@ -59,8 +63,16 @@ class InvoiceViewModel @Inject constructor(
         try {
             val profile = kotlinx.coroutines.withTimeoutOrNull(8_000L) { profileRepo.getProfile().first() }
                 ?: com.gestion.itinerario.data.entity.CompanyProfile()
-            val counter = profileRepo.incrementCounter()
-            val invoiceNumber = "${profile.invoicePrefix}-${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)}-${counter.toString().padStart(4, '0')}"
+            // incrementCounter no bloquea la factura si Firestore falla; usa timestamp como respaldo
+            val counter = try {
+                profileRepo.incrementCounter()
+            } catch (e: Exception) {
+                android.util.Log.w("InvoiceVM", "counter fallback: ${e.message}")
+                (System.currentTimeMillis() / 1000 % 9999 + 1).toInt()
+            }
+            val prefix = if (clientType.contains("Jurídica", ignoreCase = true)) "FAC-J" else "FAC-N"
+            val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+            val invoiceNumber = "$prefix-$year-${counter.toString().padStart(4, '0')}"
 
             val signatureBase64 = signatureBitmap?.let { bmp ->
                 val baos = ByteArrayOutputStream()
@@ -68,7 +80,6 @@ class InvoiceViewModel @Inject constructor(
                 android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.DEFAULT)
             } ?: ""
 
-            // El monto ingresado es el subtotal (valor del servicio); el impuesto se suma encima
             val taxAmount = totalAmount * (taxRate / 100.0)
             val grandTotal = totalAmount + taxAmount
 
@@ -101,8 +112,9 @@ class InvoiceViewModel @Inject constructor(
                 startDate          = startDate,
                 endDate            = System.currentTimeMillis()
             )
-            val id = invoiceRepo.save(invoice)
+            val id = kotlinx.coroutines.withTimeout(15_000L) { invoiceRepo.save(invoice) }
             _savedInvoiceId.value = id
+            _lastCreatedInvoice.value = invoice.copy(id = id)
             onDone(id, invoiceNumber)
         } catch (e: Exception) {
             e.printStackTrace()

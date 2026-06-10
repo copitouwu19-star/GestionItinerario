@@ -40,11 +40,9 @@ fun SignaturePad(
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Firma del cliente", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
             TextButton(
                 onClick = { lines.clear(); currentPoints.clear(); onSignatureChanged(emptyList()) },
                 enabled = lines.isNotEmpty()

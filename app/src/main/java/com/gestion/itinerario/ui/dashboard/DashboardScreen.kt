@@ -275,8 +275,8 @@ fun DashboardScreen(
             color = MaterialTheme.colorScheme.onBackground)
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FeaturedServiceCard(modifier = Modifier.weight(1f), category = ServiceCategory.ELECTRICIDAD,
-                    onClick = { selectedCategory = ServiceCategory.ELECTRICIDAD })
+                FeaturedServiceCard(modifier = Modifier.weight(1f), category = ServiceCategory.LAVADORA,
+                    onClick = { selectedCategory = ServiceCategory.LAVADORA })
                 FeaturedServiceCard(modifier = Modifier.weight(1f), category = ServiceCategory.REFRIGERACION,
                     onClick = { selectedCategory = ServiceCategory.REFRIGERACION })
             }

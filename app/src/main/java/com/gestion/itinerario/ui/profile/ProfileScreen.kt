@@ -397,8 +397,7 @@ private fun ProfileInfoCard(profile: CompanyProfile) {
                 Triple(Icons.Default.Person,       "PROPIETARIO",               profile.ownerName.ifBlank { "Sin registrar" }),
                 Triple(Icons.Default.Phone,        "TELÉFONO",                  profile.phone.ifBlank { "Sin registrar" }),
                 Triple(Icons.Default.Email,        "CORREO",                    profile.email.ifBlank { "Sin registrar" }),
-                Triple(Icons.Default.LocationOn,   "DIRECCIÓN",                 profile.address.ifBlank { "Sin registrar" }),
-                Triple(Icons.Default.Receipt,      "PREFIJO FACTURAS",          "${profile.invoicePrefix}-XXXX")
+                Triple(Icons.Default.LocationOn,   "DIRECCIÓN",                 profile.address.ifBlank { "Sin registrar" })
             )
 
             rows.forEachIndexed { idx, (icon, label, value) ->
@@ -451,13 +450,12 @@ private fun ProfileInfoCard(profile: CompanyProfile) {
 // ─── Formulario de edición ────────────────────────────────────────────────────
 @Composable
 private fun ProfileEditForm(profile: CompanyProfile, onSave: (CompanyProfile) -> Unit, onCancel: () -> Unit) {
-    var companyName   by remember { mutableStateOf(profile.companyName) }
-    var taxId         by remember { mutableStateOf(profile.taxId) }
-    var ownerName     by remember { mutableStateOf(profile.ownerName) }
-    var phone         by remember { mutableStateOf(profile.phone) }
-    var email         by remember { mutableStateOf(profile.email) }
-    var address       by remember { mutableStateOf(profile.address) }
-    var invoicePrefix by remember { mutableStateOf(profile.invoicePrefix) }
+    var companyName by remember { mutableStateOf(profile.companyName) }
+    var taxId       by remember { mutableStateOf(profile.taxId) }
+    var ownerName   by remember { mutableStateOf(profile.ownerName) }
+    var phone       by remember { mutableStateOf(profile.phone) }
+    var email       by remember { mutableStateOf(profile.email) }
+    var address     by remember { mutableStateOf(profile.address) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -482,7 +480,7 @@ private fun ProfileEditForm(profile: CompanyProfile, onSave: (CompanyProfile) ->
             )
             OutlinedTextField(
                 value = taxId, onValueChange = { taxId = it },
-                label = { Text("NIT / Identificación fiscal") },
+                label = { Text("RIF / Registro de Información Fiscal") },
                 leadingIcon = { Icon(Icons.Default.Badge, null) },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 supportingText = { Text("Aparecerá en el encabezado de tus facturas") }
@@ -511,13 +509,6 @@ private fun ProfileEditForm(profile: CompanyProfile, onSave: (CompanyProfile) ->
                 leadingIcon = { Icon(Icons.Default.LocationOn, null) },
                 modifier = Modifier.fillMaxWidth(), singleLine = true
             )
-            OutlinedTextField(
-                value = invoicePrefix, onValueChange = { invoicePrefix = it.uppercase().take(5) },
-                label = { Text("Prefijo de facturas (ej: FAC)") },
-                leadingIcon = { Icon(Icons.Default.Receipt, null) },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                supportingText = { Text("Se verá como: $invoicePrefix-2026-0001") }
-            )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 modifier = Modifier.fillMaxWidth()
@@ -533,7 +524,7 @@ private fun ProfileEditForm(profile: CompanyProfile, onSave: (CompanyProfile) ->
                             email          = email,
                             address        = address,
                             logoUrl        = profile.logoUrl,
-                            invoicePrefix  = invoicePrefix.ifBlank { "FAC" },
+                            invoicePrefix  = profile.invoicePrefix,
                             invoiceCounter = profile.invoiceCounter
                         )
                     )

@@ -81,10 +81,10 @@ fun AppNavGraph(
                 }
             )
         }
-        composable(Routes.CLIENTS)   { ClientsScreen(innerPadding = innerPadding) }
-        composable(Routes.SERVICES)  { ServicesScreen(innerPadding = innerPadding) }
-        composable(Routes.AGENDA)    { AgendaScreen(innerPadding = innerPadding) }
-        composable(Routes.REMINDERS) { RemindersScreen(innerPadding = innerPadding) }
+        composable(Routes.CLIENTS)   { ClientsScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
+        composable(Routes.SERVICES)  { ServicesScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
+        composable(Routes.AGENDA)    { AgendaScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
+        composable(Routes.REMINDERS) { RemindersScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
         composable(Routes.PROFILE) {
             ProfileScreen(innerPadding = innerPadding, onBack = { navController.popBackStack() })
         }

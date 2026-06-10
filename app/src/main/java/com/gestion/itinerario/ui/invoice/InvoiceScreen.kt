@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +33,7 @@ import com.gestion.itinerario.data.entity.*
 import com.gestion.itinerario.ui.profile.ProfileViewModel
 import com.gestion.itinerario.ui.theme.Primary40
 import com.gestion.itinerario.ui.theme.Primary80
+import com.gestion.itinerario.ui.theme.Secondary40
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import java.text.SimpleDateFormat
 import java.util.*
@@ -49,6 +49,7 @@ fun InvoiceCreationDialog(
     clientName: String,
     clientPhone: String,
     clientAddress: String,
+    clientType: String = "Persona Natural",
     equipmentType: String,
     serviceDescription: String,
     diagnosis: String,
@@ -80,6 +81,8 @@ fun InvoiceCreationDialog(
     val taxAmount    = subtotal * (taxRateValue / 100.0)
     val grandTotal   = subtotal + taxAmount
 
+    val fieldShape = RoundedCornerShape(12.dp)
+
     LaunchedEffect(signatureLines) {
         signatureBitmap = if (signatureLines.isNotEmpty()) signatureLinesToBitmap(signatureLines) else null
     }
@@ -88,12 +91,13 @@ fun InvoiceCreationDialog(
         Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
             if (createdInvoice != null) {
                 InvoiceCreatedView(
-                    invoiceNumber = createdInvoice!!.second,
-                    invoiceId = createdInvoice!!.first,
-                    context = context,
-                    invoiceViewModel = invoiceViewModel,
-                    profile = profile,
-                    onClose = { onInvoiceCreated(createdInvoice!!.first, createdInvoice!!.second); onDismiss() }
+                    invoiceNumber     = createdInvoice!!.second,
+                    invoiceId         = createdInvoice!!.first,
+                    clientPhone       = clientPhone,
+                    context           = context,
+                    invoiceViewModel  = invoiceViewModel,
+                    profile           = profile,
+                    onClose           = { onInvoiceCreated(createdInvoice!!.first, createdInvoice!!.second); onDismiss() }
                 )
             } else {
                 Scaffold(
@@ -130,6 +134,7 @@ fun InvoiceCreationDialog(
                                             clientName         = clientName,
                                             clientPhone        = clientPhone,
                                             clientAddress      = clientAddress,
+                                            clientType         = clientType,
                                             equipmentType      = equipmentType,
                                             serviceDescription = serviceDescription,
                                             diagnosis          = diagnosis,
@@ -144,10 +149,10 @@ fun InvoiceCreationDialog(
                                                 isCreating = false
                                                 createdInvoice = Pair(id, num)
                                             },
-                                            onError = {
+                                            onError = { err ->
                                                 isCreating = false
                                                 android.widget.Toast.makeText(context,
-                                                    "No se pudo generar la factura. Intenta de nuevo.",
+                                                    "Error: ${err.message ?: err.javaClass.simpleName}",
                                                     android.widget.Toast.LENGTH_LONG).show()
                                             }
                                         )
@@ -162,7 +167,8 @@ fun InvoiceCreationDialog(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(
-                                                Brush.linearGradient(listOf(
+                                                if (isCreating) Brush.linearGradient(listOf(Color.Gray, Color.Gray))
+                                                else Brush.linearGradient(listOf(
                                                     MaterialTheme.colorScheme.primary,
                                                     MaterialTheme.colorScheme.secondary
                                                 )),
@@ -172,8 +178,12 @@ fun InvoiceCreationDialog(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (isCreating) {
-                                            CircularProgressIndicator(modifier = Modifier.size(20.dp),
-                                                strokeWidth = 2.dp, color = Color.White)
+                                            Row(verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                CircularProgressIndicator(modifier = Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp, color = Color.White)
+                                                Text("Generando…", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                            }
                                         } else {
                                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                 verticalAlignment = Alignment.CenterVertically) {
@@ -201,8 +211,7 @@ fun InvoiceCreationDialog(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
                         ) {
                             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                                 Box(modifier = Modifier.width(4.dp).fillMaxHeight()
@@ -214,7 +223,7 @@ fun InvoiceCreationDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier.size(44.dp)
-                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .clip(RoundedCornerShape(14.dp))
                                             .background(MaterialTheme.colorScheme.primary),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -234,13 +243,14 @@ fun InvoiceCreationDialog(
 
                         // ── Resumen del servicio ──────────────────────────
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("RESUMEN DEL SERVICIO", style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                letterSpacing = 1.sp)
-                            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                            SectionLabel("RESUMEN DEL SERVICIO")
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.White,
+                                shadowElevation = 3.dp,
+                                tonalElevation = 0.dp
+                            ) {
                                 Column(modifier = Modifier.padding(14.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -266,17 +276,18 @@ fun InvoiceCreationDialog(
                             }
                         }
 
-                        // ── Pago ──────────────────────────────────────────
+                        // ── Montos ────────────────────────────────────────
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("PAGO", style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                letterSpacing = 1.sp)
-                            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                            SectionLabel("PAGO")
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.White,
+                                shadowElevation = 3.dp,
+                                tonalElevation = 0.dp
+                            ) {
                                 Column(modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedTextField(
                                             value = currentTotalStr,
@@ -287,7 +298,8 @@ fun InvoiceCreationDialog(
                                             leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
                                             modifier = Modifier.weight(1f), singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                            placeholder = { Text("0.00") }
+                                            placeholder = { Text("0.00") },
+                                            shape = fieldShape
                                         )
                                         OutlinedTextField(
                                             value = currentTaxRateStr,
@@ -297,13 +309,16 @@ fun InvoiceCreationDialog(
                                             label = { Text("IVA %") },
                                             modifier = Modifier.weight(0.6f), singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                            placeholder = { Text("0") }
+                                            placeholder = { Text("0") },
+                                            shape = fieldShape
                                         )
                                     }
                                     if (taxRateValue > 0.0) {
-                                        Card(shape = RoundedCornerShape(10.dp),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.primary.copy(0.06f))) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.primary.copy(0.06f),
+                                            tonalElevation = 0.dp
+                                        ) {
                                             Column(modifier = Modifier.fillMaxWidth().padding(10.dp),
                                                 verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                                 InfoLine("Subtotal", "$${String.format("%.2f", subtotal)}")
@@ -326,31 +341,68 @@ fun InvoiceCreationDialog(
                                         label = { Text("Condición de pago") },
                                         leadingIcon = { Icon(Icons.Default.Schedule, null) },
                                         modifier = Modifier.fillMaxWidth(), singleLine = true,
-                                        placeholder = { Text("Contado, Crédito a 30 días…") }
+                                        placeholder = { Text("Contado, Crédito a 30 días…") },
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                    Text("Método de pago", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        listOf(PaymentMethod.NONE to "Sin esp.",
-                                            PaymentMethod.CASH to "Efectivo",
-                                            PaymentMethod.TRANSFER to "Transferencia"
-                                        ).forEach { (m, label) ->
-                                            FilterChip(selected = currentPayMethod == m,
-                                                onClick = { currentPayMethod = m },
-                                                label = { Text(label, style = MaterialTheme.typography.labelSmall) })
-                                        }
+                                }
+                            }
+                        }
+
+                        // ── Método de pago ────────────────────────────────
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SectionLabel("MÉTODO DE PAGO")
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.White,
+                                shadowElevation = 3.dp,
+                                tonalElevation = 0.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(
+                                        PaymentMethod.NONE     to "Sin esp.",
+                                        PaymentMethod.CASH     to "Efectivo",
+                                        PaymentMethod.TRANSFER to "Transferencia"
+                                    ).forEach { (m, label) ->
+                                        PaymentPill(
+                                            label = label,
+                                            selected = currentPayMethod == m,
+                                            onClick = { currentPayMethod = m },
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
-                                    Text("Estado del pago", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        listOf(PaymentStatus.NONE to "Sin esp.",
-                                            PaymentStatus.PENDING to "Pendiente",
-                                            PaymentStatus.PAID to "Pagado"
-                                        ).forEach { (s, label) ->
-                                            FilterChip(selected = currentPayStatus == s,
-                                                onClick = { currentPayStatus = s },
-                                                label = { Text(label, style = MaterialTheme.typography.labelSmall) })
-                                        }
+                                }
+                            }
+                        }
+
+                        // ── Estado del pago ───────────────────────────────
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SectionLabel("ESTADO DEL PAGO")
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.White,
+                                shadowElevation = 3.dp,
+                                tonalElevation = 0.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(
+                                        PaymentStatus.NONE    to "Sin esp.",
+                                        PaymentStatus.PENDING to "Pendiente",
+                                        PaymentStatus.PAID    to "Pagado"
+                                    ).forEach { (s, label) ->
+                                        PaymentPill(
+                                            label = label,
+                                            selected = currentPayStatus == s,
+                                            onClick = { currentPayStatus = s },
+                                            modifier = Modifier.weight(1f)
+                                        )
                                     }
                                 }
                             }
@@ -358,14 +410,19 @@ fun InvoiceCreationDialog(
 
                         // ── Firma digital ─────────────────────────────────
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("FIRMA DEL CLIENTE", style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                letterSpacing = 1.sp)
-                            SignaturePad(
+                            SectionLabel("FIRMA DEL CLIENTE")
+                            Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                onSignatureChanged = { signatureLines = it }
-                            )
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color.White,
+                                shadowElevation = 3.dp,
+                                tonalElevation = 0.dp
+                            ) {
+                                SignaturePad(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    onSignatureChanged = { signatureLines = it }
+                                )
+                            }
                         }
 
                         Spacer(Modifier.height(8.dp))
@@ -377,31 +434,83 @@ fun InvoiceCreationDialog(
 }
 
 @Composable
+private fun PaymentPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) Color.Transparent else Color(0xFFF0F0F0),
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (selected) Modifier.background(
+                        Brush.linearGradient(listOf(Primary40, Secondary40)),
+                        RoundedCornerShape(50)
+                    ) else Modifier
+                )
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                color = if (selected) Color.White else Color(0xFF6B6B6B)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        letterSpacing = 1.sp)
+}
+
+@Composable
 private fun InvoiceCreatedView(
     invoiceNumber: String,
     invoiceId: String,
+    clientPhone: String,
     context: android.content.Context,
     invoiceViewModel: InvoiceViewModel,
     profile: CompanyProfile,
     onClose: () -> Unit
 ) {
-    val invoices by invoiceViewModel.invoices.collectAsStateWithLifecycle()
-    val invoice = invoices.firstOrNull { it.id == invoiceId }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var isGenerating by remember { mutableStateOf(false) }
+    val lastCreated by invoiceViewModel.lastCreatedInvoice.collectAsStateWithLifecycle()
+    val invoicesFlow by invoiceViewModel.invoices.collectAsStateWithLifecycle()
+    val invoice = lastCreated?.takeIf { it.id == invoiceId }
+        ?: invoicesFlow.firstOrNull { it.id == invoiceId }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var isGeneratingPdf by remember { mutableStateOf(false) }
+    var isGeneratingWa  by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally) {
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Spacer(Modifier.height(8.dp))
-        Box(modifier = Modifier.size(72.dp).background(StatusCompleted.copy(0.15f), shape = RoundedCornerShape(36.dp)),
-            contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.size(72.dp)
+                .background(StatusCompleted.copy(0.15f), shape = RoundedCornerShape(36.dp)),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(Icons.Default.CheckCircle, null, tint = StatusCompleted, modifier = Modifier.size(40.dp))
         }
         Text("¡Factura Generada!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(invoiceNumber, style = MaterialTheme.typography.titleMedium, color = Primary80)
 
-        // Muestra logo de empresa si existe
         if (profile.logoUrl.isNotBlank()) {
             val logoData: Any = remember(profile.logoUrl) {
                 if (profile.logoUrl.startsWith("data:")) {
@@ -419,61 +528,80 @@ private fun InvoiceCreatedView(
 
         HorizontalDivider()
 
-        // Botones de acción
-        Button(
-            onClick = {
-                invoice?.let { inv ->
-                    isGenerating = true
+        if (invoice == null) {
+            CircularProgressIndicator(color = Primary40)
+            Text("Cargando factura…", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            // Enviar por WhatsApp (directo al cliente si hay teléfono)
+            Button(
+                onClick = {
+                    isGeneratingWa = true
                     scope.launch {
                         try {
-                            val file = invoiceViewModel.generatePdf(context, inv, profile)
-                            InvoicePdfGenerator.shareViaWhatsApp(context, file)
+                            val file = invoiceViewModel.generatePdf(context, invoice, profile)
+                            if (clientPhone.isNotBlank()) {
+                                InvoicePdfGenerator.shareViaWhatsAppTo(context, file, clientPhone)
+                            } else {
+                                InvoicePdfGenerator.shareViaWhatsApp(context, file)
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
-                            android.widget.Toast.makeText(context, "No se pudo generar el PDF. Intenta de nuevo.", android.widget.Toast.LENGTH_LONG).show()
+                            android.widget.Toast.makeText(context,
+                                "No se pudo generar el PDF.", android.widget.Toast.LENGTH_LONG).show()
                         }
-                        isGenerating = false
+                        isGeneratingWa = false
                     }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isGeneratingWa && !isGeneratingPdf,
+                colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
+                shape = RoundedCornerShape(50)
+            ) {
+                if (isGeneratingWa) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Generando…")
+                } else {
+                    Icon(painterResource(R.drawable.ic_whatsapp), null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (clientPhone.isNotBlank()) "Enviar al cliente por WhatsApp" else "Compartir por WhatsApp",
+                        fontWeight = FontWeight.SemiBold)
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isGenerating,
-            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
-        ) {
-            if (isGenerating) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("Generando PDF…")
-            } else {
-                Icon(painterResource(R.drawable.ic_whatsapp), null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Enviar por WhatsApp")
             }
-        }
 
-        OutlinedButton(
-            onClick = {
-                invoice?.let { inv ->
-                    isGenerating = true
+            // Ver PDF
+            OutlinedButton(
+                onClick = {
+                    isGeneratingPdf = true
                     scope.launch {
                         try {
-                            val file = invoiceViewModel.generatePdf(context, inv, profile)
-                            android.widget.Toast.makeText(context, "Factura guardada en el dispositivo. Abriendo…", android.widget.Toast.LENGTH_SHORT).show()
+                            val file = invoiceViewModel.generatePdf(context, invoice, profile)
+                            android.widget.Toast.makeText(context,
+                                "Abriendo PDF…", android.widget.Toast.LENGTH_SHORT).show()
                             InvoicePdfGenerator.openPdf(context, file)
                         } catch (e: Exception) {
                             e.printStackTrace()
-                            android.widget.Toast.makeText(context, "No se pudo generar el PDF. Intenta de nuevo.", android.widget.Toast.LENGTH_LONG).show()
+                            android.widget.Toast.makeText(context,
+                                "No se pudo generar el PDF.", android.widget.Toast.LENGTH_LONG).show()
                         }
-                        isGenerating = false
+                        isGeneratingPdf = false
                     }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isGeneratingPdf && !isGeneratingWa,
+                shape = RoundedCornerShape(50)
+            ) {
+                if (isGeneratingPdf) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Generando…")
+                } else {
+                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ver / Exportar PDF")
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isGenerating
-        ) {
-            Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Exportar PDF")
+            }
         }
 
         TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {

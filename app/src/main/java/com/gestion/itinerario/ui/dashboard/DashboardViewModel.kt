@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.HomeRepairService
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -55,10 +56,10 @@ data class TodayStats(
 
 /** Categoría de servicio derivada del tipo de equipo / descripción, usada para íconos y accesos rápidos. */
 enum class ServiceCategory(val label: String, val icon: ImageVector, val color: Color) {
-    ELECTRICIDAD("Electricidad",       Icons.Filled.Bolt,   Color(0xFFFBC02D)),
-    REFRIGERACION("Refrigeración",     Icons.Filled.AcUnit, Color(0xFF29B6F6)),
+    LAVADORA("Lavadora",              Icons.Filled.WaterDrop, Color(0xFF42A5F5)),
+    REFRIGERACION("Refrigeración",    Icons.Filled.AcUnit,   Color(0xFF29B6F6)),
     AIRE_ACONDICIONADO("Aire Acondicionado", Icons.Filled.AcUnit, Color(0xFF26C6DA)),
-    OTROS("Otros",                     Icons.Filled.MoreHoriz, Color(0xFF9575CD))
+    OTROS("Otros",                    Icons.Filled.MoreHoriz, Color(0xFF9575CD))
 }
 
 /** Determina la categoría visual de un servicio a partir del tipo de equipo y/o su descripción. */
@@ -69,8 +70,8 @@ fun classifyServiceCategory(equipmentType: String, text: String = ""): ServiceCa
             ServiceCategory.AIRE_ACONDICIONADO
         "nevera" in haystack || "refriger" in haystack || "congela" in haystack ->
             ServiceCategory.REFRIGERACION
-        "eléctric" in haystack || "electric" in haystack || "tablero" in haystack || "cableado" in haystack ->
-            ServiceCategory.ELECTRICIDAD
+        "lavadora" in haystack || "washing" in haystack || "lavarrop" in haystack ->
+            ServiceCategory.LAVADORA
         else -> ServiceCategory.OTROS
     }
 }
@@ -268,8 +269,13 @@ class DashboardViewModel @Inject constructor(
         val clientMap = clientList.associateBy { it.id }
         fun clientName(id: String) = clientMap[id]?.let { "${it.name} ${it.lastName}".trim() } ?: "Cliente"
 
+        val now = System.currentTimeMillis()
         val items = mutableListOf<NotificationItem>()
-        appts.filter { it.status != AppointmentStatus.CANCELLED }.forEach { a ->
+        // Citas futuras (SCHEDULED con dateTime > ahora) se omiten del panel — solo se muestran cuando ya llegó su hora
+        appts.filter {
+            it.status != AppointmentStatus.CANCELLED &&
+            (it.status != AppointmentStatus.SCHEDULED || it.dateTime <= now)
+        }.forEach { a ->
             val label = "${a.serviceType.shortLabel()} — ${clientName(a.clientId)}"
             val completed = a.status == AppointmentStatus.COMPLETED
             items += NotificationItem(

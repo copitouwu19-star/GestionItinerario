@@ -40,6 +40,7 @@ import java.util.*
 @Composable
 fun ServicesScreen(
     innerPadding: PaddingValues = PaddingValues(),
+    onNavigateToProfile: () -> Unit = {},
     viewModel: ServiceViewModel = hiltViewModel(),
     agendaViewModel: com.gestion.itinerario.ui.agenda.AgendaViewModel = hiltViewModel(),
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
@@ -83,9 +84,10 @@ fun ServicesScreen(
                 ServiceStatus.COMPLETED -> appt.status == AppointmentStatus.COMPLETED
                 else -> false
             }
+        }.let { list ->
+            if (filterStatus == ServiceStatus.COMPLETED) list.sortedByDescending { it.dateTime } else list
         }
     } else {
-        // En "Todos" mostramos solo pendientes y en proceso
         allAppointments.filter { it.status == AppointmentStatus.SCHEDULED || it.status == AppointmentStatus.IN_PROGRESS }
     }
 
@@ -108,12 +110,6 @@ fun ServicesScreen(
         )
     }
 
-    // ── Métricas semanales ────────────────────────────────────────────────────
-    val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
-    val weeklyCompleted = orders.count { it.status == ServiceStatus.COMPLETED && (it.completedAt ?: 0L) >= weekAgo }
-    val weeklyTotal = orders.count { it.createdAt >= weekAgo }
-    val efficiency = if (weeklyTotal > 0) weeklyCompleted * 100 / weeklyTotal else 100
-
     // ── Citas de hoy ─────────────────────────────────────────────────────────
     val todayStart = remember {
         java.util.Calendar.getInstance().apply {
@@ -131,18 +127,30 @@ fun ServicesScreen(
                     IconButton(onClick = { showQuotes = true }) {
                         Icon(Icons.Default.RequestQuote, contentDescription = "Cotizaciones")
                     }
+                    IconButton(onClick = onNavigateToProfile) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
+                            tint = com.gestion.itinerario.ui.theme.Primary80,
+                            modifier = androidx.compose.ui.Modifier.size(28.dp))
+                    }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { editOrder = null; showDialog = true }, containerColor = Primary40) {
+            FloatingActionButton(
+                onClick = { editOrder = null; showDialog = true },
+                containerColor = Primary40,
+                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+            ) {
                 Icon(Icons.Default.Add, null, tint = Color.White)
             }
         }
     ) { padding ->
         Column(
             modifier = Modifier
-                .padding(top = padding.calculateTopPadding())
+                .padding(
+                    top    = padding.calculateTopPadding(),
+                    bottom = innerPadding.calculateBottomPadding()
+                )
                 .fillMaxSize()
         ) {
             // ── Tabs de filtro personalizados ─────────────────────────────
@@ -281,38 +289,6 @@ fun ServicesScreen(
                         }
                     }
 
-                    // ── Métricas Semanales ────────────────────────────────
-                    item { Spacer(Modifier.height(8.dp)) }
-                    item {
-                        Text(
-                            "Métricas Semanales",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            ServiceMetricTile(
-                                modifier  = Modifier.weight(1f),
-                                value     = "$weeklyCompleted",
-                                label     = "COMPLETADOS",
-                                icon      = Icons.Default.CheckCircle,
-                                gradient  = Brush.linearGradient(listOf(Primary40, Color(0xFF5B21B6)))
-                            )
-                            ServiceMetricTile(
-                                modifier  = Modifier.weight(1f),
-                                value     = "$efficiency%",
-                                label     = "EFICIENCIA",
-                                icon      = Icons.Default.TrendingUp,
-                                gradient  = Brush.linearGradient(listOf(Secondary40, Color(0xFF9D174D)))
-                            )
-                        }
-                    }
-                    item { Spacer(Modifier.height(8.dp)) }
                 }
             }
         }
@@ -356,6 +332,7 @@ fun ServicesScreen(
             clientName         = client?.let { "${it.name} ${it.lastName}".trim() } ?: "",
             clientPhone        = client?.phone ?: "",
             clientAddress      = client?.address ?: "",
+            clientType         = client?.clientType ?: "Persona Natural",
             equipmentType      = order.equipmentType,
             serviceDescription = order.description,
             diagnosis          = order.diagnosis,
@@ -388,6 +365,7 @@ fun ServicesScreen(
             clientName         = clientName,
             clientPhone        = client?.phone ?: "",
             clientAddress      = client?.address ?: "",
+            clientType         = client?.clientType ?: "Persona Natural",
             equipmentType      = appt.equipmentType,
             serviceDescription = serviceDesc,
             diagnosis          = "",
@@ -436,7 +414,11 @@ fun ServicesScreen(
             clientName = clientFullName(appt.clientId),
             professionalName = professionalName,
             clientPhone = clientMap[appt.clientId]?.phone ?: "",
-            onDismiss = { detailAppointment = null }
+            onDismiss = { detailAppointment = null },
+            onCompleted = { completedAppt ->
+                detailAppointment = null
+                invoiceAppointment = completedAppt
+            }
         )
     }
 }
@@ -571,41 +553,6 @@ private fun ServiceFilterTab(label: String, selected: Boolean, onClick: () -> Un
     }
 }
 
-// ─── Tile de métrica semanal ──────────────────────────────────────────────────
-@Composable
-private fun ServiceMetricTile(
-    modifier: Modifier,
-    value: String,
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    gradient: Brush
-) {
-    Box(
-        modifier = modifier
-            .height(96.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(gradient)
-            .padding(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Icon(icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(22.dp))
-            Column {
-                Text(value,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White)
-                Text(label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.8f),
-                    letterSpacing = 0.5.sp)
-            }
-        }
-    }
-}
-
 // ─── Tarjeta de cita programada ───────────────────────────────────────────────
 @Composable
 fun ScheduledAppointmentCard(
@@ -620,23 +567,22 @@ fun ScheduledAppointmentCard(
     val sdfDate = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
     val sdfTime = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
     val tipoLabel = appointment.serviceType.displayName()
-
-    val isDark = appointment.status == AppointmentStatus.IN_PROGRESS
-    val cardBg = if (isDark) DarkBackground else Color.White
-    val textColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
-    val subtextColor = if (isDark) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val subtextColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     val (statusColor, statusLabel) = when (appointment.status) {
-        AppointmentStatus.SCHEDULED   -> StatusPending   to "PROGRAMADA"
-        AppointmentStatus.IN_PROGRESS -> StatusInRepair  to "EN PROCESO"
-        AppointmentStatus.COMPLETED   -> StatusCompleted to "COMPLETADA"
-        AppointmentStatus.CANCELLED   -> StatusLowStock  to "CANCELADA"
+        AppointmentStatus.SCHEDULED   -> StatusPending       to "PROGRAMADA"
+        AppointmentStatus.IN_PROGRESS -> StatusInRepair       to "EN PROCESO"
+        AppointmentStatus.COMPLETED   -> StatusCompleted     to "COMPLETADA"
+        AppointmentStatus.CANCELLED   -> StatusLowStock      to "CANCELADA"
     }
+    val isEditable = appointment.status != AppointmentStatus.COMPLETED &&
+                     appointment.status != AppointmentStatus.CANCELLED
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(22.dp),
-        colors   = CardDefaults.cardColors(containerColor = cardBg)
+        colors   = CardDefaults.cardColors(containerColor = Color.White),
+        onClick  = onViewDetails
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             // Borde izquierdo degradado
@@ -655,7 +601,7 @@ fun ScheduledAppointmentCard(
                     .padding(horizontal = 14.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Nombre + estado
+                // Nombre + lápiz editar + badge estado
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
@@ -664,21 +610,35 @@ fun ScheduledAppointmentCard(
                         clientName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = textColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                         maxLines = 1
                     )
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = statusColor.copy(alpha = if (isDark) 0.22f else 0.12f)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            statusLabel,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor
-                        )
+                        if (isEditable) {
+                            IconButton(
+                                onClick = onEdit,
+                                modifier = Modifier.size(26.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, null,
+                                    tint = Primary40, modifier = Modifier.size(15.dp))
+                            }
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = statusColor.copy(alpha = 0.13f)
+                        ) {
+                            Text(
+                                statusLabel,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
                     }
                 }
                 // Tipo de servicio
@@ -726,53 +686,43 @@ fun ScheduledAppointmentCard(
                             style = MaterialTheme.typography.bodySmall, color = subtextColor)
                     }
                 }
-                // Botones de acción
-                if (appointment.status != AppointmentStatus.COMPLETED &&
-                    appointment.status != AppointmentStatus.CANCELLED) {
+                // Botones de acción (solo para SCHEDULED e IN_PROGRESS)
+                if (isEditable) {
                     Spacer(Modifier.height(2.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        when (appointment.status) {
-                            AppointmentStatus.SCHEDULED -> {
-                                Button(
-                                    onClick = onStart,
-                                    modifier = Modifier.weight(1f).height(38.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Primary40),
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text("EN PROCESO",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            AppointmentStatus.IN_PROGRESS -> {
-                                Button(
-                                    onClick = onComplete,
-                                    modifier = Modifier.weight(1f).height(38.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = StatusCompleted),
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text("COMPLETAR",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            else -> {}
+                        // Botón principal con degradado
+                        val actionLabel = if (appointment.status == AppointmentStatus.SCHEDULED)
+                            "EN PROCESO" else "COMPLETAR"
+                        val actionClick: () -> Unit = if (appointment.status == AppointmentStatus.SCHEDULED)
+                            onStart else onComplete
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Brush.linearGradient(listOf(Primary40, Secondary40)))
+                                .clickable { actionClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(actionLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White)
                         }
+                        // Botón cancelar outlined
                         OutlinedButton(
                             onClick = onCancel,
                             modifier = Modifier.weight(1f).height(38.dp),
                             shape = RoundedCornerShape(50),
                             border = androidx.compose.foundation.BorderStroke(
-                                1.dp, if (isDark) Color.White.copy(0.3f) else MaterialTheme.colorScheme.outline.copy(0.4f)
+                                1.dp, MaterialTheme.colorScheme.outline.copy(0.4f)
                             ),
                             contentPadding = PaddingValues(0.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             )
                         ) {
                             Text("CANCELAR",
@@ -780,32 +730,6 @@ fun ScheduledAppointmentCard(
                                 fontWeight = FontWeight.Bold)
                         }
                     }
-                }
-                // Ver detalles link (small)
-                if (appointment.status != AppointmentStatus.CANCELLED) {
-                    TextButton(
-                        onClick = onViewDetails,
-                        modifier = Modifier.align(Alignment.End).height(28.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
-                    ) {
-                        Text("Ver detalles",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.primary)
-                        Icon(Icons.Default.ArrowForward, null,
-                            modifier = Modifier.size(12.dp),
-                            tint = if (isDark) Color.White.copy(0.7f) else MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-            // Botón editar (top right)
-            if (appointment.status != AppointmentStatus.COMPLETED && appointment.status != AppointmentStatus.CANCELLED) {
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.align(Alignment.Top).padding(top = 6.dp, end = 4.dp).size(32.dp)
-                ) {
-                    Icon(Icons.Default.Edit, null,
-                        tint = if (isDark) Color.White.copy(0.7f) else Primary40,
-                        modifier = Modifier.size(16.dp))
                 }
             }
         }

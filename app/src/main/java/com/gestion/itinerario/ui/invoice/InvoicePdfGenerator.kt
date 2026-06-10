@@ -283,4 +283,22 @@ object InvoicePdfGenerator {
             ))
         }
     }
+
+    fun shareViaWhatsAppTo(context: Context, file: File, phone: String) {
+        if (phone.isBlank()) { shareViaWhatsApp(context, file); return }
+        val cleaned = phone.trimStart('+').let { if (it.startsWith("0")) "58${it.drop(1)}" else it }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra("jid", "$cleaned@s.whatsapp.net")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            setPackage("com.whatsapp")
+        }
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            shareViaWhatsApp(context, file)
+        }
+    }
 }

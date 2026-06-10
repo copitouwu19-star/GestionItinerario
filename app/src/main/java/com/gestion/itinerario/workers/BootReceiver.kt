@@ -16,7 +16,6 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 class BootReceiver : BroadcastReceiver() {
 
@@ -47,6 +46,8 @@ class BootReceiver : BroadcastReceiver() {
 
                 val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                 val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+                val ms24h = 24 * 60 * 60 * 1000L
+                val ms5h  =  5 * 60 * 60 * 1000L
 
                 upcoming.forEach { (id, dateTime, extra) ->
                     val (serviceType, notes) = extra
@@ -57,15 +58,14 @@ class BootReceiver : BroadcastReceiver() {
                         ServiceType.INSTALLATION -> "Instalación"
                     }
                     val clientName = notes.substringBefore(" —").ifBlank { "Cliente" }
-                    val rc = id.hashCode()
+                    val rc = id.hashCode() and 0x3FFFFFFF
 
-                    scheduleAlarm(context, am, rc + 1000,
-                        dateTime - TimeUnit.HOURS.toMillis(5),
-                        "Recordatorio — En 5 horas", "$tipo con $clientName a las $hora")
-
-                    scheduleAlarm(context, am, rc,
-                        dateTime,
-                        "¡Ahora! $tipo", "$tipo con $clientName programado para ahora ($hora)")
+                    scheduleAlarm(context, am, rc + 2, dateTime - ms24h,
+                        "Cita mañana — $tipo", "$tipo con $clientName mañana a las $hora")
+                    scheduleAlarm(context, am, rc + 1, dateTime - ms5h,
+                        "Cita en 5 horas — $tipo", "$tipo con $clientName hoy a las $hora")
+                    scheduleAlarm(context, am, rc, dateTime,
+                        "¡Ahora! $tipo", "$tipo con $clientName a las $hora")
                 }
             } catch (e: Exception) {
                 // boot re-scheduling is best-effort
@@ -73,15 +73,15 @@ class BootReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun scheduleAlarm(context: Context, am: AlarmManager, rc: Int, triggerAt: Long, title: String, message: String) {
+    private fun scheduleAlarm(context: Context, am: AlarmManager, requestCode: Int, triggerAt: Long, title: String, message: String) {
         if (triggerAt <= System.currentTimeMillis()) return
         val intent = Intent(context, ReminderAlarmReceiver::class.java).apply {
             putExtra(ReminderAlarmReceiver.EXTRA_TITLE, title)
             putExtra(ReminderAlarmReceiver.EXTRA_MESSAGE, message)
-            putExtra(ReminderAlarmReceiver.EXTRA_NOTIF_ID, rc)
+            putExtra(ReminderAlarmReceiver.EXTRA_NOTIF_ID, requestCode)
         }
         val pi = PendingIntent.getBroadcast(
-            context, rc, intent,
+            context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         // setAlarmClock dispara exactamente en triggerAt, exento de Doze/App Standby

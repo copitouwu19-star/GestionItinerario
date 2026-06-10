@@ -87,10 +87,16 @@ class ProfileRepository @Inject constructor(
     }
 
     suspend fun incrementCounter(): Int {
-        val snap = doc.get().await()
-        val current = snap.getLong("invoiceCounter")?.toInt() ?: 0
-        val next = current + 1
-        doc.update("invoiceCounter", next).await()
-        return next
+        return kotlinx.coroutines.withTimeout(12_000L) {
+            val snap = doc.get().await()
+            val current = snap.getLong("invoiceCounter")?.toInt() ?: 0
+            val next = current + 1
+            // set+merge crea el doc si no existe; update() fallaba cuando no existía
+            doc.set(
+                mapOf("invoiceCounter" to next),
+                com.google.firebase.firestore.SetOptions.merge()
+            ).await()
+            next
+        }
     }
 }

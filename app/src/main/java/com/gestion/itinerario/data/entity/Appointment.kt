@@ -11,5 +11,8 @@ data class Appointment(
     val status: AppointmentStatus = AppointmentStatus.SCHEDULED,
     val notes: String = "",
     val equipmentType: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val photosBefore: List<String> = emptyList(),
+    val photosDuring: List<String> = emptyList(),
+    val photosAfter: List<String> = emptyList()
 )

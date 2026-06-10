@@ -25,13 +25,24 @@ import java.util.*
 @Composable
 fun RemindersScreen(
     innerPadding: PaddingValues = PaddingValues(),
+    onNavigateToProfile: () -> Unit = {},
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     var showDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Mantenimiento Periódico", fontWeight = FontWeight.Bold) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Mantenimiento Periódico", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = onNavigateToProfile) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
+                            tint = Primary40, modifier = Modifier.size(28.dp))
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showDialog = true },

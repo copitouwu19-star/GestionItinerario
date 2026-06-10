@@ -11,7 +11,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,11 +19,16 @@ class AlarmScheduler @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    companion object {
+        private const val MS_24H = 24 * 60 * 60 * 1000L
+        private const val MS_5H  =  5 * 60 * 60 * 1000L
+    }
+
     fun schedule(a: Appointment): Boolean {
         val now = System.currentTimeMillis()
         if (a.dateTime <= now) return true
 
-        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val am  = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
         val hora = sdf.format(Date(a.dateTime))
         val tipo = when (a.serviceType) {
@@ -33,27 +37,32 @@ class AlarmScheduler @Inject constructor(
             ServiceType.INSTALLATION -> "Instalación"
         }
         val clientName = a.notes.substringBefore(" —").ifBlank { "Cliente" }
-        val timeRemainingMs = a.dateTime - now
-        val rc = a.id.hashCode()
 
-        scheduleAlarm(am, rc, a.dateTime, "¡Ahora! $tipo", "$tipo con $clientName programado para ahora ($hora)")
+        // Usamos hash positivo de 30 bits para evitar requestCodes negativos
+        val rc = a.id.hashCode() and 0x3FFFFFFF
 
-        if (timeRemainingMs > TimeUnit.HOURS.toMillis(5)) {
-            scheduleAlarm(
-                am, rc + 1000,
-                a.dateTime - TimeUnit.HOURS.toMillis(5),
-                "Recordatorio — En 5 horas",
-                "$tipo con $clientName a las $hora"
-            )
-        }
+        // Alarma 1 — 24 horas antes
+        scheduleAlarm(am, rc + 2, a.dateTime - MS_24H,
+            "Cita mañana — $tipo",
+            "$tipo con $clientName mañana a las $hora")
+
+        // Alarma 2 — 5 horas antes
+        scheduleAlarm(am, rc + 1, a.dateTime - MS_5H,
+            "Cita en 5 horas — $tipo",
+            "$tipo con $clientName hoy a las $hora")
+
+        // Alarma 3 — exactamente a la hora de la cita
+        scheduleAlarm(am, rc, a.dateTime,
+            "¡Ahora! $tipo",
+            "$tipo con $clientName a las $hora")
 
         return true
     }
 
     fun cancel(appointmentId: String) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val rc = appointmentId.hashCode()
-        listOf(rc, rc + 1000).forEach { code ->
+        val rc = appointmentId.hashCode() and 0x3FFFFFFF
+        listOf(rc, rc + 1, rc + 2).forEach { code ->
             val intent = Intent(context, ReminderAlarmReceiver::class.java)
             val pi = PendingIntent.getBroadcast(
                 context, code, intent,
@@ -65,12 +74,7 @@ class AlarmScheduler @Inject constructor(
 
     fun canScheduleExact(): Boolean {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        return canScheduleExact(am)
-    }
-
-    private fun canScheduleExact(am: AlarmManager): Boolean = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> am.canScheduleExactAlarms()
-        else -> true
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
     }
 
     private fun scheduleAlarm(am: AlarmManager, requestCode: Int, triggerAt: Long, title: String, message: String) {
@@ -84,8 +88,8 @@ class AlarmScheduler @Inject constructor(
             context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        // setAlarmClock dispara exactamente en triggerAt sin requerir SCHEDULE_EXACT_ALARM
-        // y no está sujeto a los retrasos de Doze mode (setAndAllowWhileIdle puede tardar ~30 min)
+        // setAlarmClock: exento de Doze mode, no requiere SCHEDULE_EXACT_ALARM,
+        // es el método más confiable para recordatorios exactos
         am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, null), pi)
     }
 }

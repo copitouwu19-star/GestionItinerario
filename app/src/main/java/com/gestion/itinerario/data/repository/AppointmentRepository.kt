@@ -85,9 +85,13 @@ private fun Appointment.toMap(): Map<String, Any?> = mapOf(
     "status" to status.name,
     "notes" to notes,
     "equipmentType" to equipmentType,
-    "createdAt" to createdAt
+    "createdAt" to createdAt,
+    "photosBefore" to photosBefore,
+    "photosDuring" to photosDuring,
+    "photosAfter" to photosAfter
 )
 
+@Suppress("UNCHECKED_CAST")
 private fun com.google.firebase.firestore.DocumentSnapshot.toAppointment(): Appointment? {
     if (!exists()) return null
     return try {
@@ -100,7 +104,10 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toAppointment(): Appo
             status = AppointmentStatus.valueOf(getString("status") ?: "SCHEDULED"),
             notes = getString("notes") ?: "",
             equipmentType = getString("equipmentType") ?: "",
-            createdAt = getLong("createdAt") ?: System.currentTimeMillis()
+            createdAt = getLong("createdAt") ?: System.currentTimeMillis(),
+            photosBefore = (get("photosBefore") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            photosDuring = (get("photosDuring") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            photosAfter  = (get("photosAfter")  as? List<*>)?.filterIsInstance<String>() ?: emptyList()
         )
     } catch (e: Exception) { null }
 }

@@ -68,6 +68,7 @@ val EQUIPMENT_TYPES = listOf("Nevera", "Aire Acondicionado", "Lavadora", "Otro")
 @Composable
 fun AgendaScreen(
     innerPadding: PaddingValues,
+    onNavigateToProfile: () -> Unit = {},
     viewModel: AgendaViewModel = hiltViewModel(),
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
@@ -146,11 +147,23 @@ fun AgendaScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Agenda", fontWeight = FontWeight.Bold) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Agenda", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = onNavigateToProfile) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
+                            tint = com.gestion.itinerario.ui.theme.Primary80,
+                            modifier = Modifier.size(28.dp))
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { editAppointment = null; showDialog = true },
-                containerColor = Primary40
+                containerColor = Primary40,
+                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
             ) { Icon(Icons.Default.EventAvailable, null, tint = Color.White) }
         }
     ) { scaffoldPadding ->

@@ -82,6 +82,10 @@ class ServiceViewModel @Inject constructor(
         appointmentRepo.update(a.copy(status = AppointmentStatus.CANCELLED))
     }
 
+    fun updateAppointment(a: Appointment) = viewModelScope.launch {
+        appointmentRepo.update(a)
+    }
+
     fun scheduleNextMaintenance(
         equipmentId: String,
         clientId: String,
