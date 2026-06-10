@@ -210,7 +210,7 @@ fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(16.dp),
+        shape    = RoundedCornerShape(22.dp),
         colors   = CardDefaults.cardColors(containerColor = Color.White),
         onClick  = onView
     ) {
@@ -224,7 +224,7 @@ fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -
                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                             if (isJuridica) listOf(Secondary40, Primary40) else listOf(Primary40, Secondary40)
                         ),
-                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        shape = RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp)
                     )
             )
             // Cuerpo
@@ -451,7 +451,7 @@ fun ClientDetailScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -464,7 +464,7 @@ fun ClientDetailScreen(
                                     brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                                         listOf(Primary40, Secondary40)
                                     ),
-                                    shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp)
+                                    shape = RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp)
                                 )
                         )
                         Column(
@@ -630,7 +630,7 @@ private fun StatTileCard(modifier: Modifier, count: Int, label: String, accentCo
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .background(accentColor, RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp))
+                    .background(accentColor, RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
             )
         }
     }
@@ -663,7 +663,7 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentC
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -671,7 +671,7 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentC
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .background(accentColor, RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+                    .background(accentColor, RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp))
             )
             Column(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -759,7 +759,7 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat, acc
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -767,7 +767,7 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat, acc
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .background(accentColor, RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+                    .background(accentColor, RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp))
             )
             Column(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -838,7 +838,7 @@ private fun InvoiceHistoryCard(
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -846,7 +846,7 @@ private fun InvoiceHistoryCard(
                 modifier = Modifier
                     .width(4.dp)
                     .fillMaxHeight()
-                    .background(accentColor, RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
+                    .background(accentColor, RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp))
             )
             Column(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

@@ -155,6 +155,7 @@ fun ServicesScreen(
                 ServiceFilterTab("Todos", selected = filterStatus == null) { filterStatus = null }
                 ServiceFilterTab("Pendiente", selected = filterStatus == ServiceStatus.PENDING) { filterStatus = ServiceStatus.PENDING }
                 ServiceFilterTab("En Proceso", selected = filterStatus == ServiceStatus.IN_PROGRESS) { filterStatus = ServiceStatus.IN_PROGRESS }
+                ServiceFilterTab("Finalizado", selected = filterStatus == ServiceStatus.COMPLETED) { filterStatus = ServiceStatus.COMPLETED }
             }
 
             val noOrders       = filteredOrders.isEmpty()
@@ -547,10 +548,7 @@ private fun ServiceFilterTab(label: String, selected: Boolean, onClick: () -> Un
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50),
-        color = Color.Transparent,
-        border = if (selected) null else androidx.compose.foundation.BorderStroke(
-            1.dp, MaterialTheme.colorScheme.outlineVariant
-        )
+        color = if (selected) Color.Transparent else Color(0xFFF0F0F0)
     ) {
         Box(
             modifier = Modifier
@@ -560,14 +558,14 @@ private fun ServiceFilterTab(label: String, selected: Boolean, onClick: () -> Un
                         RoundedCornerShape(50)
                     ) else Modifier
                 )
-                .padding(horizontal = 18.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (selected) Color.White else Color(0xFF6B6B6B)
             )
         }
     }
@@ -637,7 +635,7 @@ fun ScheduledAppointmentCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(16.dp),
+        shape    = RoundedCornerShape(22.dp),
         colors   = CardDefaults.cardColors(containerColor = cardBg)
     ) {
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
@@ -648,7 +646,7 @@ fun ScheduledAppointmentCard(
                     .fillMaxHeight()
                     .background(
                         Brush.verticalGradient(listOf(Primary40, Secondary40)),
-                        RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                        RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp)
                     )
             )
             Column(
@@ -742,7 +740,7 @@ fun ScheduledAppointmentCard(
                                     onClick = onStart,
                                     modifier = Modifier.weight(1f).height(38.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Primary40),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(50),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text("EN PROCESO",
@@ -755,7 +753,7 @@ fun ScheduledAppointmentCard(
                                     onClick = onComplete,
                                     modifier = Modifier.weight(1f).height(38.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = StatusCompleted),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(50),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
                                     Text("COMPLETAR",
@@ -768,7 +766,7 @@ fun ScheduledAppointmentCard(
                         OutlinedButton(
                             onClick = onCancel,
                             modifier = Modifier.weight(1f).height(38.dp),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(50),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp, if (isDark) Color.White.copy(0.3f) else MaterialTheme.colorScheme.outline.copy(0.4f)
                             ),
@@ -845,7 +843,7 @@ fun ServiceOrderCard(
 ) {
     val statusColor = order.status.color()
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
