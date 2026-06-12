@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,13 +34,17 @@ class QuoteRepository @Inject constructor(private val db: FirebaseFirestore) {
 
     suspend fun save(quote: Quote): String {
         val ref = if (quote.id.isEmpty()) col.document() else col.document(quote.id)
-        ref.set(quote.toMap()).await()
+        try { withTimeout(5_000L) { ref.set(quote.toMap()).await() } } catch (_: Exception) {}
         return ref.id
     }
 
-    suspend fun update(quote: Quote) { col.document(quote.id).set(quote.toMap()).await() }
+    suspend fun update(quote: Quote) {
+        try { withTimeout(5_000L) { col.document(quote.id).set(quote.toMap()).await() } } catch (_: Exception) {}
+    }
 
-    suspend fun delete(quote: Quote) { col.document(quote.id).delete().await() }
+    suspend fun delete(quote: Quote) {
+        try { withTimeout(5_000L) { col.document(quote.id).delete().await() } } catch (_: Exception) {}
+    }
 }
 
 @Suppress("UNCHECKED_CAST")

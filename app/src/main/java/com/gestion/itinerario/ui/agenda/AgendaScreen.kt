@@ -48,6 +48,7 @@ import com.gestion.itinerario.data.entity.Appointment
 import com.gestion.itinerario.data.entity.AppointmentStatus
 import com.gestion.itinerario.data.entity.Client
 import com.gestion.itinerario.data.entity.ServiceType
+import com.gestion.itinerario.ui.components.UserMenuIconButton
 import com.gestion.itinerario.ui.services.displayName
 import com.gestion.itinerario.ui.theme.*
 import com.gestion.itinerario.util.hoursUntil
@@ -58,8 +59,8 @@ import kotlinx.coroutines.launch
 
 private val WhatsAppGreen = Color(0xFF25D366)
 
-private val ColorCita = Color(0xFF1565C0)
-private val ColorMantenimiento = Color(0xFF2E7D32)
+private val ColorCita = Primary40
+private val ColorMantenimiento = Secondary40
 
 // Tipos de equipo disponibles
 val EQUIPMENT_TYPES = listOf("Nevera", "Aire Acondicionado", "Lavadora", "Otro")
@@ -69,6 +70,7 @@ val EQUIPMENT_TYPES = listOf("Nevera", "Aire Acondicionado", "Lavadora", "Otro")
 fun AgendaScreen(
     innerPadding: PaddingValues,
     onNavigateToProfile: () -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: AgendaViewModel = hiltViewModel(),
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
@@ -116,11 +118,7 @@ fun AgendaScreen(
         }.sortedBy { it.dateTime }
     }
 
-    val routeStops = remember(selectedDayCitas, clients) {
-        selectedDayCitas
-            .filter { it.status == AppointmentStatus.SCHEDULED || it.status == AppointmentStatus.IN_PROGRESS }
-            .mapNotNull { appt -> clients.firstOrNull { c -> c.id == appt.clientId }?.address?.takeIf { it.isNotBlank() } }
-    }
+    val sortedAppointments = remember(appointments) { appointments.sortedBy { it.dateTime } }
 
     // Diálogo de confirmación cancelar cita
     if (showCancelConfirm && appointmentToCancel != null) {
@@ -147,28 +145,22 @@ fun AgendaScreen(
     }
 
     Scaffold(
+        containerColor = Color(0xFFF5F5F5),
         topBar = {
             TopAppBar(
                 title = { Text("Agenda", fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
                 actions = {
-                    IconButton(onClick = onNavigateToProfile) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
-                            tint = com.gestion.itinerario.ui.theme.Primary80,
-                            modifier = Modifier.size(28.dp))
-                    }
+                    UserMenuIconButton(
+                        onNavigateToProfile = onNavigateToProfile,
+                        onLogout = onLogout
+                    )
                 }
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { editAppointment = null; showDialog = true },
-                containerColor = Primary40,
-                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
-            ) { Icon(Icons.Default.EventAvailable, null, tint = Color.White) }
-        }
     ) { scaffoldPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(
+            modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5)).padding(
                 top    = scaffoldPadding.calculateTopPadding(),
                 bottom = maxOf(innerPadding.calculateBottomPadding(), scaffoldPadding.calculateBottomPadding())
             ),
@@ -210,27 +202,6 @@ fun AgendaScreen(
                         Text("${selectedDayCitas.size} evento(s)",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall, color = Primary80)
-                    }
-                }
-            }
-            if (routeStops.isNotEmpty()) {
-                item {
-                    OutlinedButton(
-                        onClick = {
-                            val destination = Uri.encode(routeStops.last())
-                            val uri = if (routeStops.size > 1) {
-                                val waypoints = "optimize:true|" + routeStops.dropLast(1).joinToString("|") { Uri.encode(it) }
-                                Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$destination&waypoints=$waypoints&travelmode=driving")
-                            } else {
-                                Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$destination&travelmode=driving")
-                            }
-                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Directions, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Ver ruta optimizada del día (${routeStops.size} parada${if (routeStops.size != 1) "s" else ""})")
                     }
                 }
             }
@@ -309,6 +280,7 @@ fun AgendaScreen(
                 items(selectedDayCitas, key = { it.id }) { a ->
                     AppointmentCard(
                         a,
+                        displayIndex = sortedAppointments.indexOfFirst { it.id == a.id },
                         client      = clients.firstOrNull { it.id == a.clientId },
                         companyName = companyProfile.companyName,
                         onEdit     = { editAppointment = a; showDialog = true },
@@ -352,8 +324,8 @@ fun CalendarCard(
     var firstDayOfWeek = firstDayCal.get(Calendar.DAY_OF_WEEK) - 2
     if (firstDayOfWeek < 0) firstDayOfWeek = 6
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+        color = Color.White, tonalElevation = 0.dp, shadowElevation = 3.dp) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -405,17 +377,17 @@ fun CalendarDayCell(
     hasMantenimiento: Boolean, hasCita: Boolean,
     modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
-    val gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary))
+    val gradient = Brush.linearGradient(listOf(Primary40, Secondary40))
     Box(modifier = modifier.height(42.dp).padding(2.dp).clip(RoundedCornerShape(8.dp))
-        .then(if (isSelected) Modifier.background(Primary80) else Modifier)
+        .then(if (isSelected && !isToday) Modifier.background(Primary80) else Modifier)
         .clickable { onClick() }, contentAlignment = Alignment.Center) {
-        if (isToday && !isSelected) {
-            Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(gradient))
+        if (isToday) {
+            Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(gradient))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text(day.toString(), fontSize = 13.sp,
                 fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected || isToday) Color.White else MaterialTheme.colorScheme.onSurface)
+                color = if (isToday || isSelected) Color.White else MaterialTheme.colorScheme.onSurface)
             if (hasMantenimiento || hasCita) {
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (hasCita) Box(modifier = Modifier.size(5.dp).clip(CircleShape)
@@ -440,6 +412,7 @@ fun LegendItem(color: Color, label: String) {
 @Composable
 fun AppointmentCard(
     a: Appointment,
+    displayIndex: Int = -1,
     client: Client?,
     companyName: String,
     onEdit: () -> Unit,
@@ -451,21 +424,33 @@ fun AppointmentCard(
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     val isMantenimiento = a.serviceType == ServiceType.MAINTENANCE
     val accentColor = if (isMantenimiento) ColorMantenimiento else ColorCita
+    val idLabel = if (displayIndex >= 0) "CT-${(displayIndex + 1).toString().padStart(3, '0')}"
+                  else "CT-${(a.id.hashCode().and(0x7FFFFFFF) % 1_000).toString().padStart(3, '0')}"
 
     val (statusLabel, statusColor) = when (a.status) {
-        AppointmentStatus.SCHEDULED   -> "Programada"  to Primary80
+        AppointmentStatus.SCHEDULED   -> "Programada"  to StatusPending
         AppointmentStatus.IN_PROGRESS -> "En Proceso"  to StatusInRepair
         AppointmentStatus.COMPLETED   -> "Completada"  to StatusCompleted
         AppointmentStatus.CANCELLED   -> "Cancelada"   to StatusLowStock
     }
 
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+        color = Color.White, tonalElevation = 0.dp, shadowElevation = 3.dp) {
         Box {
         Row(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.width(5.dp).fillMaxHeight()
                 .background(accentColor, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)))
-            Column(modifier = Modifier.padding(12.dp).padding(end = 36.dp).weight(1f)) {
+            Column(modifier = Modifier.padding(12.dp).weight(1f)) {
+                // ID auto-generado (no editable) en la parte superior
+                if (a.id.isNotBlank()) {
+                    Surface(shape = RoundedCornerShape(6.dp), color = accentColor.copy(0.12f)) {
+                        Text(idLabel,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold, color = accentColor)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(if (isMantenimiento) Icons.Default.Build else Icons.Default.EventAvailable,
                         null, tint = accentColor, modifier = Modifier.size(18.dp))
@@ -516,6 +501,45 @@ fun AppointmentCard(
                     }
                 }
 
+                // Countdown regresivo + ruta individual
+                if (a.status == AppointmentStatus.SCHEDULED || a.status == AppointmentStatus.IN_PROGRESS) {
+                    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+                    LaunchedEffect(a.id) {
+                        while (true) {
+                            kotlinx.coroutines.delay(30_000L)
+                            nowMs = System.currentTimeMillis()
+                        }
+                    }
+                    val diff = a.dateTime - nowMs
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val countdownText = when {
+                            diff <= 0L        -> "En curso"
+                            diff < 60_000L    -> "< 1 min"
+                            diff < 3_600_000L -> "en ${diff / 60_000}m"
+                            else -> {
+                                val h = diff / 3_600_000L
+                                val m = (diff % 3_600_000L) / 60_000L
+                                if (h < 24L) { if (m > 0) "en ${h}h ${m}m" else "en ${h}h" }
+                                else "en ${diff / 86_400_000L}d"
+                            }
+                        }
+                        Surface(shape = RoundedCornerShape(8.dp), color = Primary40.copy(alpha = 0.10f)) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Timer, null, modifier = Modifier.size(12.dp), tint = Primary40)
+                                Text(countdownText, style = MaterialTheme.typography.labelSmall, color = Primary40, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+
                 // Botones de acción según ciclo de estado
                 if (a.status == AppointmentStatus.SCHEDULED || a.status == AppointmentStatus.IN_PROGRESS) {
                     Spacer(Modifier.height(8.dp))
@@ -538,6 +562,28 @@ fun AppointmentCard(
                                 )
                             }
                             else -> {}
+                        }
+                        if (client?.address?.isNotBlank() == true) {
+                            val addr = client.address
+                            OutlinedButton(
+                                onClick = {
+                                    val geoUri = Uri.parse("geo:0,0?q=${Uri.encode(addr)}")
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+                                    try {
+                                        context.startActivity(Intent.createChooser(mapIntent, "Navegar a..."))
+                                    } catch (_: Exception) {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW,
+                                            Uri.parse("https://www.google.com/maps/dir/?api=1&destination=${Uri.encode(addr)}&travelmode=driving")))
+                                    }
+                                },
+                                shape = RoundedCornerShape(50),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(Icons.Default.Directions, null, modifier = Modifier.size(14.dp), tint = Primary40)
+                                Spacer(Modifier.width(4.dp))
+                                Text("Navegar", style = MaterialTheme.typography.labelSmall, color = Primary40)
+                            }
                         }
                         Spacer(Modifier.weight(1f))
                         if (a.status == AppointmentStatus.SCHEDULED && client?.phone?.isNotBlank() == true) {
@@ -571,6 +617,7 @@ fun AppointmentCard(
             }
         }
     }
+
 }
 
 /** Mini-stepper Pendiente → En Proceso → Finalizado: el paso actual se resalta con el degradado de la app. */

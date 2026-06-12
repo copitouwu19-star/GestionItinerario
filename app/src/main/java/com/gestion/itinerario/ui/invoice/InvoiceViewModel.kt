@@ -112,10 +112,21 @@ class InvoiceViewModel @Inject constructor(
                 startDate          = startDate,
                 endDate            = System.currentTimeMillis()
             )
-            val id = kotlinx.coroutines.withTimeout(15_000L) { invoiceRepo.save(invoice) }
+            val id = invoiceRepo.save(invoice)
             _savedInvoiceId.value = id
             _lastCreatedInvoice.value = invoice.copy(id = id)
             onDone(id, invoiceNumber)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onError(e)
+        }
+    }
+
+    fun updateInvoice(invoice: Invoice, onDone: () -> Unit = {}, onError: (Throwable) -> Unit = {}) = viewModelScope.launch {
+        try {
+            invoiceRepo.save(invoice)
+            _lastCreatedInvoice.value = invoice
+            onDone()
         } catch (e: Exception) {
             e.printStackTrace()
             onError(e)

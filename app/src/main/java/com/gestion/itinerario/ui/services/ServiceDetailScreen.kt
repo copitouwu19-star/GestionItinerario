@@ -148,6 +148,8 @@ fun ServiceDetailScreen(
     if (showCompleteDialog) {
         AlertDialog(
             onDismissRequest = { showCompleteDialog = false },
+            containerColor = Color.White,
+            tonalElevation = 0.dp,
             icon = { Icon(Icons.Default.CameraAlt, null, tint = Primary40) },
             title = { Text("¿Añadir fotos antes de finalizar?", fontWeight = FontWeight.Bold) },
             text  = { Text("¿Deseas añadir fotos del resultado final del servicio (\"Después\") antes de generar la factura?") },
@@ -226,6 +228,8 @@ fun ServiceDetailScreen(
     if (showPhotoSourceDialog) {
         AlertDialog(
             onDismissRequest = { showPhotoSourceDialog = false },
+            containerColor = Color.White,
+            tonalElevation = 0.dp,
             title = { Text("Agregar foto", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -331,8 +335,9 @@ fun ServiceDetailScreen(
                         }
                     }
 
-                    // ── Detalles del Trabajo (solo si hay notas) ──────────────
-                    if (liveAppt.notes.isNotBlank()) {
+                    // ── Detalles del Trabajo (solo si hay descripción real, sin nombre de cliente) ──
+                    val workDescription = liveAppt.notes.substringAfter(" — ", "")
+                    if (workDescription.isNotBlank()) {
                         Card(
                             shape  = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -341,7 +346,7 @@ fun ServiceDetailScreen(
                                 Text("Detalles del Trabajo",
                                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 HorizontalDivider()
-                                Text(liveAppt.notes,
+                                Text(workDescription,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface)
                             }

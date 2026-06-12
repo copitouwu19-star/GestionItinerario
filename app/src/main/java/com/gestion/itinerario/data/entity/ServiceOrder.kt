@@ -24,5 +24,6 @@ data class ServiceOrder(
     val createdAt: Long = System.currentTimeMillis(),
     val completedAt: Long? = null,
     val warrantyMonths: Int = 0,
-    val warrantyExpiresAt: Long? = null
+    val warrantyExpiresAt: Long? = null,
+    val sourceReminderId: String = ""
 )

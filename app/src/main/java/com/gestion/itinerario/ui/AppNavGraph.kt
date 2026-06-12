@@ -81,10 +81,10 @@ fun AppNavGraph(
                 }
             )
         }
-        composable(Routes.CLIENTS)   { ClientsScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
-        composable(Routes.SERVICES)  { ServicesScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
-        composable(Routes.AGENDA)    { AgendaScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
-        composable(Routes.REMINDERS) { RemindersScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }) }
+        composable(Routes.CLIENTS)   { ClientsScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
+        composable(Routes.SERVICES)  { ServicesScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
+        composable(Routes.AGENDA)    { AgendaScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
+        composable(Routes.REMINDERS) { RemindersScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
         composable(Routes.PROFILE) {
             ProfileScreen(innerPadding = innerPadding, onBack = { navController.popBackStack() })
         }

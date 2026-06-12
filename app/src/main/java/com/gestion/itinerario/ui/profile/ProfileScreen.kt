@@ -264,7 +264,7 @@ fun ProfileScreen(
                 }
 
                 Text(
-                    if (uploadState is UploadState.Loading) "SUBIENDO LOGO…" else "TAP TO CHANGE LOGO",
+                    if (uploadState is UploadState.Loading) "SUBIENDO LOGO…" else "TOCA PARA CAMBIAR DE LOGO",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -393,7 +393,7 @@ private fun ProfileInfoCard(profile: CompanyProfile) {
 
             val rows = listOf(
                 Triple(Icons.Default.Business,    "EMPRESA",                   profile.companyName.ifBlank { "Sin registrar" }),
-                Triple(Icons.Default.Badge,        "NIT / IDENTIFICACIÓN FISCAL", profile.taxId.ifBlank { "Sin registrar" }),
+                Triple(Icons.Default.Badge,        "RIF / REGISTRO UNICO DE INFORMACIÓN FISCAL", profile.taxId.ifBlank { "Sin registrar" }),
                 Triple(Icons.Default.Person,       "PROPIETARIO",               profile.ownerName.ifBlank { "Sin registrar" }),
                 Triple(Icons.Default.Phone,        "TELÉFONO",                  profile.phone.ifBlank { "Sin registrar" }),
                 Triple(Icons.Default.Email,        "CORREO",                    profile.email.ifBlank { "Sin registrar" }),
@@ -480,7 +480,7 @@ private fun ProfileEditForm(profile: CompanyProfile, onSave: (CompanyProfile) ->
             )
             OutlinedTextField(
                 value = taxId, onValueChange = { taxId = it },
-                label = { Text("RIF / Registro de Información Fiscal") },
+                label = { Text("RIF / Registro Unico de Información Fiscal") },
                 leadingIcon = { Icon(Icons.Default.Badge, null) },
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
                 supportingText = { Text("Aparecerá en el encabezado de tus facturas") }

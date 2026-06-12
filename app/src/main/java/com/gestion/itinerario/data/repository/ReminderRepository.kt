@@ -35,10 +35,14 @@ class ReminderRepository @Inject constructor(private val db: FirebaseFirestore) 
             .documents.mapNotNull { it.toReminder() }
             .filter { it.nextServiceDate <= date }
 
-    suspend fun save(r: MaintenanceReminder) {
+    suspend fun save(r: MaintenanceReminder): String {
         val ref = if (r.id.isEmpty()) col.document() else col.document(r.id)
         ref.set(r.toMap()).await()
+        return ref.id
     }
+
+    suspend fun getById(id: String): MaintenanceReminder? =
+        col.document(id).get().await().toReminder()
 
     suspend fun update(r: MaintenanceReminder) { col.document(r.id).set(r.toMap()).await() }
     suspend fun delete(r: MaintenanceReminder) { col.document(r.id).delete().await() }
@@ -46,6 +50,7 @@ class ReminderRepository @Inject constructor(private val db: FirebaseFirestore) 
 
 private fun MaintenanceReminder.toMap(): Map<String, Any?> = mapOf(
     "equipmentId" to equipmentId,
+    "equipmentType" to equipmentType,
     "clientId" to clientId,
     "intervalValue" to intervalValue,
     "intervalUnit" to intervalUnit.name,
@@ -53,7 +58,12 @@ private fun MaintenanceReminder.toMap(): Map<String, Any?> = mapOf(
     "lastServiceDate" to lastServiceDate,
     "nextServiceDate" to nextServiceDate,
     "notes" to notes,
-    "isActive" to isActive
+    "isActive" to isActive,
+    "source" to source,
+    "workStatus" to workStatus,
+    "photosBefore" to photosBefore,
+    "photosDuring" to photosDuring,
+    "photosAfter" to photosAfter
 )
 
 private fun com.google.firebase.firestore.DocumentSnapshot.toReminder(): MaintenanceReminder? {
@@ -64,6 +74,7 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toReminder(): Mainten
         MaintenanceReminder(
             id = id,
             equipmentId = getString("equipmentId") ?: "",
+            equipmentType = getString("equipmentType") ?: "",
             clientId = getString("clientId") ?: "",
             intervalValue = value,
             intervalUnit = unit,
@@ -71,7 +82,12 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toReminder(): Mainten
             lastServiceDate = getLong("lastServiceDate") ?: 0L,
             nextServiceDate = getLong("nextServiceDate") ?: 0L,
             notes = getString("notes") ?: "",
-            isActive = getBoolean("isActive") ?: true
+            isActive = getBoolean("isActive") ?: true,
+            source = getString("source") ?: com.gestion.itinerario.data.entity.REMINDER_SOURCE_MANUAL,
+            workStatus = getString("workStatus") ?: "PENDING",
+            photosBefore = (get("photosBefore") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+            photosDuring = (get("photosDuring") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+            photosAfter  = (get("photosAfter")  as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
         )
     } catch (e: Exception) { null }
 }

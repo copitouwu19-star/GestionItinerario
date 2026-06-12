@@ -41,6 +41,7 @@ import java.util.*
 fun ServicesScreen(
     innerPadding: PaddingValues = PaddingValues(),
     onNavigateToProfile: () -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: ServiceViewModel = hiltViewModel(),
     agendaViewModel: com.gestion.itinerario.ui.agenda.AgendaViewModel = hiltViewModel(),
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
@@ -74,7 +75,26 @@ fun ServicesScreen(
     var confirmMessage by remember { mutableStateOf("") }
     var confirmAction  by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    val filteredOrders = if (filterStatus != null) orders.filter { it.status == filterStatus } else orders
+    val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val now = remember { System.currentTimeMillis() }
+
+    // Detalle / factura / próximo ciclo / edición para mantenimientos
+    var detailReminder    by remember { mutableStateOf<com.gestion.itinerario.data.entity.MaintenanceReminder?>(null) }
+    var invoiceReminder   by remember { mutableStateOf<com.gestion.itinerario.data.entity.MaintenanceReminder?>(null) }
+    var completedReminder by remember { mutableStateOf<com.gestion.itinerario.data.entity.MaintenanceReminder?>(null) }
+    var editReminderDialog by remember { mutableStateOf<com.gestion.itinerario.data.entity.MaintenanceReminder?>(null) }
+
+    val filteredOrders = if (filterStatus != null)
+        orders.filter { it.status == filterStatus && it.type != ServiceType.MAINTENANCE }
+    else
+        orders.filter { it.type != ServiceType.MAINTENANCE }
+
+    val filteredMaintenanceReminders = when (filterStatus) {
+        ServiceStatus.PENDING     -> reminders.filter { it.workStatus == "PENDING" }
+        ServiceStatus.IN_PROGRESS -> reminders.filter { it.workStatus == "IN_PROGRESS" }
+        ServiceStatus.COMPLETED   -> reminders.filter { it.workStatus == "COMPLETED" }
+        else                      -> reminders.filter { it.workStatus != "COMPLETED" }
+    }.sortedBy { it.nextServiceDate }
 
     val filteredAppointments = if (filterStatus != null) {
         allAppointments.filter { appt ->
@@ -137,7 +157,7 @@ fun ServicesScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { editOrder = null; showDialog = true },
+                onClick = { editAppointment = null; showAppointmentDialog = true },
                 containerColor = Primary40,
                 modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
             ) {
@@ -168,8 +188,9 @@ fun ServicesScreen(
 
             val noOrders       = filteredOrders.isEmpty()
             val noAppointments = filteredAppointments.isEmpty()
+            val noMaintenance  = filteredMaintenanceReminders.isEmpty()
 
-            if (noOrders && noAppointments) {
+            if (noOrders && noAppointments && noMaintenance) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -289,6 +310,68 @@ fun ServicesScreen(
                         }
                     }
 
+                    // ── Mantenimientos preventivos ────────────────────────
+                    if (filteredMaintenanceReminders.isNotEmpty()) {
+                        item {
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Engineering,
+                                        contentDescription = null,
+                                        tint = Primary40,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "Mantenimientos preventivos",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Primary40.copy(alpha = 0.12f)
+                                ) {
+                                    Text(
+                                        "${filteredMaintenanceReminders.size}",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Primary40
+                                    )
+                                }
+                            }
+                        }
+                        items(filteredMaintenanceReminders, key = { "maint_${it.id}" }) { r ->
+                            val client = clientMap[r.clientId]
+                            val clientName = client?.let { "${it.name}${if (it.lastName.isNotBlank()) " ${it.lastName}" else ""}" } ?: "Sin cliente"
+                            PreventiveMaintenanceCard(
+                                reminder   = r,
+                                clientName = clientName,
+                                onClick    = { detailReminder = r },
+                                onStart    = { viewModel.updateReminderStatus(r, "IN_PROGRESS") },
+                                onComplete = {
+                                    viewModel.updateReminderStatus(r, "COMPLETED")
+                                    invoiceReminder = r
+                                },
+                                onEdit     = { editReminderDialog = r },
+                                onCancel   = {
+                                    confirmTitle   = "Cancelar mantenimiento"
+                                    confirmMessage = "¿Estás segura de que deseas cancelar este mantenimiento preventivo? Se eliminará de la lista."
+                                    confirmAction  = { viewModel.deleteReminder(r) }
+                                }
+                            )
+                        }
+                    }
+
                 }
             }
         }
@@ -395,7 +478,8 @@ fun ServicesScreen(
                     clientId      = appt.clientId,
                     intervalValue = intervalValue,
                     intervalUnit  = intervalUnit,
-                    notes         = "Auto: ${appt.equipmentType.ifBlank { appt.serviceType.name }}"
+                    equipmentType = appt.equipmentType,
+                    notes         = appt.equipmentType.ifBlank { appt.serviceType.name }
                 )
                 completedAppointment = null
             }
@@ -421,18 +505,82 @@ fun ServicesScreen(
             }
         )
     }
+
+    // ── Detalle de mantenimiento preventivo ───────────────────────────────────
+    detailReminder?.let { r ->
+        val client = clientMap[r.clientId]
+        val cn = client?.let { "${it.name}${if (it.lastName.isNotBlank()) " ${it.lastName}" else ""}" } ?: "Sin cliente"
+        MaintenanceDetailScreen(
+            reminder         = r,
+            clientName       = cn,
+            clientPhone      = client?.phone ?: "",
+            professionalName = professionalName,
+            onDismiss        = { detailReminder = null },
+            onCompleted      = { completedR ->
+                detailReminder = null
+                invoiceReminder = completedR
+            }
+        )
+    }
+
+    // ── Factura para mantenimiento completado ─────────────────────────────────
+    invoiceReminder?.let { r ->
+        val client = clientMap[r.clientId]
+        val cn = client?.let { "${it.name}${if (it.lastName.isNotBlank()) " ${it.lastName}" else ""}" } ?: "Sin cliente"
+        val serviceDesc = "Mantenimiento preventivo${if (r.equipmentType.isNotBlank()) " – ${r.equipmentType}" else ""}"
+        InvoiceCreationDialog(
+            serviceOrderId     = r.id,
+            clientId           = r.clientId,
+            clientName         = cn,
+            clientPhone        = client?.phone ?: "",
+            clientAddress      = client?.address ?: "",
+            clientType         = client?.clientType ?: "Persona Natural",
+            equipmentType      = r.equipmentType,
+            serviceDescription = serviceDesc,
+            diagnosis          = r.notes,
+            totalAmount        = 0.0,
+            paymentMethod      = com.gestion.itinerario.data.entity.PaymentMethod.NONE,
+            paymentStatus      = com.gestion.itinerario.data.entity.PaymentStatus.NONE,
+            startDate          = if (r.nextServiceDate > 0L) r.nextServiceDate else System.currentTimeMillis(),
+            onDismiss          = { invoiceReminder = null; completedReminder = r },
+            onInvoiceCreated   = { _, _ -> invoiceReminder = null; completedReminder = r }
+        )
+    }
+
+    // ── Diálogo "Programar próximo ciclo de mantenimiento" ────────────────────
+    completedReminder?.let { r ->
+        MaintenanceNextCycleDialog(
+            reminder  = r,
+            onDismiss = { completedReminder = null },
+            onSchedule = {
+                viewModel.markReminderDone(r)
+                completedReminder = null
+            }
+        )
+    }
+
+    // ── Diálogo de edición de mantenimiento preventivo ─────────────────────
+    editReminderDialog?.let { r ->
+        val clientsForEdit by viewModel.clientRepo.getAll().collectAsStateWithLifecycle(emptyList())
+        com.gestion.itinerario.ui.reminders.ReminderFormDialog(
+            clients   = clientsForEdit,
+            initial   = r,
+            onDismiss = { editReminderDialog = null },
+            onSave    = { updated ->
+                viewModel.updateReminder(updated.copy(id = r.id))
+                editReminderDialog = null
+            }
+        )
+    }
 }
 
 // ─── Diálogo de próximo mantenimiento ────────────────────────────────────────
 private data class MaintInterval(val value: Int, val unit: IntervalUnit, val label: String)
 
 private val MAINT_OPTIONS = listOf(
-    MaintInterval(1, IntervalUnit.WEEKS,  "1 semana"),
-    MaintInterval(2, IntervalUnit.WEEKS,  "2 semanas"),
-    MaintInterval(1, IntervalUnit.MONTHS, "1 mes"),
-    MaintInterval(2, IntervalUnit.MONTHS, "2 meses"),
-    MaintInterval(3, IntervalUnit.MONTHS, "3 meses"),
-    MaintInterval(6, IntervalUnit.MONTHS, "6 meses")
+    MaintInterval(3,  IntervalUnit.MONTHS, "3 meses"),
+    MaintInterval(6,  IntervalUnit.MONTHS, "6 meses"),
+    MaintInterval(12, IntervalUnit.MONTHS, "1 año")
 )
 
 @Composable
@@ -441,11 +589,13 @@ private fun NextMaintenanceDialog(
     onDismiss: () -> Unit,
     onSchedule: (Int, IntervalUnit) -> Unit
 ) {
-    var selected by remember { mutableStateOf(MAINT_OPTIONS[4]) } // default 3 meses
+    var selected by remember { mutableStateOf(MAINT_OPTIONS[0]) } // default 3 meses
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        tonalElevation = 0.dp,
         icon = { Icon(Icons.Default.NotificationsActive, null, tint = Primary80) },
         title = { Text("¿Programar próximo mantenimiento?", fontWeight = FontWeight.Bold) },
         text = {
@@ -454,18 +604,36 @@ private fun NextMaintenanceDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Intervalo:", style = MaterialTheme.typography.labelMedium)
-                // Semanas
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MAINT_OPTIONS.filter { it.unit == IntervalUnit.WEEKS }.forEach { opt ->
-                        FilterChip(selected = selected == opt, onClick = { selected = opt },
-                            label = { Text(opt.label, style = MaterialTheme.typography.labelSmall) })
-                    }
-                }
-                // Meses
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MAINT_OPTIONS.filter { it.unit == IntervalUnit.MONTHS }.forEach { opt ->
-                        FilterChip(selected = selected == opt, onClick = { selected = opt },
-                            label = { Text(opt.label, style = MaterialTheme.typography.labelSmall) })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MAINT_OPTIONS.forEach { opt ->
+                        val isSelected = selected == opt
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        Brush.linearGradient(listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary
+                                        )),
+                                        RoundedCornerShape(50)
+                                    )
+                                    .clickable { selected = opt }
+                                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(opt.label, style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { selected = opt },
+                                shape = RoundedCornerShape(50),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
+                                modifier = Modifier.height(38.dp)
+                            ) {
+                                Text(opt.label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
                     }
                 }
                 // Fecha estimada
@@ -520,6 +688,264 @@ fun SectionHeader(
             Text("$count", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                 style = MaterialTheme.typography.labelSmall, color = Primary40,
                 fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// ─── Diálogo "Programar próximo ciclo" ───────────────────────────────────────
+@Composable
+private fun MaintenanceNextCycleDialog(
+    reminder: com.gestion.itinerario.data.entity.MaintenanceReminder,
+    onDismiss: () -> Unit,
+    onSchedule: () -> Unit
+) {
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val intervalLabel = when (reminder.intervalUnit) {
+        IntervalUnit.WEEKS  -> "cada ${reminder.intervalValue} semana(s)"
+        IntervalUnit.MONTHS -> when (reminder.intervalValue) {
+            12 -> "cada 1 año"; else -> "cada ${reminder.intervalValue} mes(es)"
+        }
+    }
+    val cal = java.util.Calendar.getInstance().apply {
+        when (reminder.intervalUnit) {
+            IntervalUnit.WEEKS  -> add(java.util.Calendar.WEEK_OF_YEAR, reminder.intervalValue)
+            IntervalUnit.MONTHS -> add(java.util.Calendar.MONTH, reminder.intervalValue)
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        tonalElevation = 0.dp,
+        icon = { Icon(Icons.Default.NotificationsActive, null, tint = Primary80) },
+        title = { Text("¿Programar próximo ciclo?", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Mantenimiento completado: ${reminder.equipmentType.ifBlank { "equipo" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Frecuencia configurada: $intervalLabel",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Surface(shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(0.5f)) {
+                    Row(modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CalendarToday, null,
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Text("Próximo: ${sdf.format(cal.time)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onSchedule) { Text("Confirmar ciclo") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Omitir") }
+        }
+    )
+}
+
+// ─── Tarjeta de mantenimiento preventivo en ServicesScreen ───────────────────
+@Composable
+private fun PreventiveMaintenanceCard(
+    reminder: MaintenanceReminder,
+    clientName: String,
+    onClick: () -> Unit = {},
+    onStart: () -> Unit = {},
+    onComplete: () -> Unit = {},
+    onEdit: () -> Unit = {},
+    onCancel: () -> Unit = {}
+) {
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    val sdfDate = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val now = remember { System.currentTimeMillis() }
+    val isDue = reminder.nextServiceDate <= now
+    val daysLeft = ((reminder.nextServiceDate - now) / 86_400_000L).toInt()
+    val isAuto = reminder.source == com.gestion.itinerario.data.entity.REMINDER_SOURCE_AUTO
+
+    val accentColor = when (reminder.workStatus) {
+        "IN_PROGRESS" -> StatusInRepair
+        "COMPLETED"   -> StatusCompleted
+        else -> when {
+            isDue || daysLeft <= 3 -> Color(0xFFD32F2F)
+            daysLeft in 4..7       -> Color(0xFFFF8F00)
+            daysLeft in 8..30      -> Primary40
+            else                   -> Color(0xFF00897B)
+        }
+    }
+    val equipIcon = when (reminder.equipmentType.lowercase()) {
+        "nevera"             -> Icons.Default.AcUnit
+        "aire acondicionado" -> Icons.Default.Air
+        "lavadora"           -> Icons.Default.WaterDrop
+        else                 -> Icons.Default.Build
+    }
+    val intervalText = when (reminder.intervalValue) {
+        12   -> "Cada 1 año"
+        else -> "Cada ${reminder.intervalValue} mes(es)"
+    }
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White,
+        tonalElevation = 0.dp,
+        shadowElevation = 2.dp
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(accentColor, RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp))
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(accentColor.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(equipIcon, null, tint = accentColor, modifier = Modifier.size(22.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(clientName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                        Text(reminder.equipmentType.ifBlank { "Equipo" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(intervalText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (reminder.workStatus != "COMPLETED") {
+                                IconButton(onClick = onEdit, modifier = Modifier.size(26.dp)) {
+                                    Icon(Icons.Default.Edit, null,
+                                        tint = Primary40, modifier = Modifier.size(15.dp))
+                                }
+                            }
+                            Surface(shape = RoundedCornerShape(6.dp), color = accentColor.copy(alpha = 0.13f)) {
+                                Text(
+                                    when (reminder.workStatus) {
+                                        "IN_PROGRESS" -> "EN PROCESO"
+                                        "COMPLETED"   -> "COMPLETADO"
+                                        else -> if (isDue) "VENCIDO" else "EN $daysLeft DÍAS"
+                                    },
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accentColor
+                                )
+                            }
+                        }
+                        Surface(shape = RoundedCornerShape(6.dp), color = Primary40.copy(0.1f)) {
+                            Text(
+                                "MANTENIMIENTO",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Primary40, fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                if (isAuto && reminder.lastServiceDate > 0L) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("ÚLTIMO SERVICIO",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+                            Text(sdfDate.format(Date(reminder.lastServiceDate)),
+                                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("PRÓXIMO SERVICIO",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+                            Text(sdfDate.format(Date(reminder.nextServiceDate)),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold, color = accentColor)
+                        }
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(if (isAuto) "PRÓXIMO SERVICIO" else "FECHA DEL SERVICIO",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 0.5.sp)
+                            Text(
+                                if (reminder.nextServiceDate > 0L) {
+                                    if (isAuto) sdfDate.format(Date(reminder.nextServiceDate))
+                                    else sdf.format(Date(reminder.nextServiceDate))
+                                } else "Sin fecha",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold, color = accentColor)
+                        }
+                    }
+                }
+
+                // ── Botones de acción inline ──────────────────────────────
+                if (reminder.workStatus != "COMPLETED") {
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val actionLabel = if (reminder.workStatus == "PENDING") "INICIAR" else "COMPLETAR"
+                        val actionClick: () -> Unit = if (reminder.workStatus == "PENDING") onStart else onComplete
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Brush.linearGradient(listOf(Primary40, Secondary40)))
+                                .clickable { actionClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(actionLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White)
+                        }
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            shape = RoundedCornerShape(50),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp, MaterialTheme.colorScheme.outline.copy(0.4f)
+                            ),
+                            contentPadding = PaddingValues(0.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Text("CANCELAR",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -695,7 +1121,7 @@ fun ScheduledAppointmentCard(
                     ) {
                         // Botón principal con degradado
                         val actionLabel = if (appointment.status == AppointmentStatus.SCHEDULED)
-                            "EN PROCESO" else "COMPLETAR"
+                            "INICIAR" else "COMPLETAR"
                         val actionClick: () -> Unit = if (appointment.status == AppointmentStatus.SCHEDULED)
                             onStart else onComplete
                         Box(

@@ -115,12 +115,28 @@ fun SignaturePad(
 
 fun signatureLinesToBitmap(lines: List<SignatureLine>, width: Int = 600, height: Int = 200): Bitmap? {
     if (lines.isEmpty()) return null
+
+    // Calcular los límites reales de los puntos capturados en pantalla
+    val allPoints = lines.flatMap { it.points }
+    val minX = allPoints.minOf { it.x }
+    val maxX = allPoints.maxOf { it.x }
+    val minY = allPoints.minOf { it.y }
+    val maxY = allPoints.maxOf { it.y }
+    val srcW = (maxX - minX).coerceAtLeast(1f)
+    val srcH = (maxY - minY).coerceAtLeast(1f)
+
+    // Escalar para que el trazo ocupe el bitmap completo con padding
+    val pad = 20f
+    val scale = minOf((width - pad * 2f) / srcW, (height - pad * 2f) / srcH)
+    val offsetX = pad + ((width - pad * 2f) - srcW * scale) / 2f - minX * scale
+    val offsetY = pad + ((height - pad * 2f) - srcH * scale) / 2f - minY * scale
+
     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(bmp)
     canvas.drawColor(android.graphics.Color.WHITE)
     val paint = AndroidPaint().apply {
         color = android.graphics.Color.rgb(26, 35, 126)
-        strokeWidth = 4f
+        strokeWidth = (4f / scale).coerceIn(2f, 6f)
         style = AndroidPaint.Style.STROKE
         strokeCap = AndroidPaint.Cap.ROUND
         isAntiAlias = true
@@ -128,7 +144,9 @@ fun signatureLinesToBitmap(lines: List<SignatureLine>, width: Int = 600, height:
     lines.forEach { line ->
         val path = AndroidPath()
         line.points.forEachIndexed { i, pt ->
-            if (i == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
+            val x = pt.x * scale + offsetX
+            val y = pt.y * scale + offsetY
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
         canvas.drawPath(path, paint)
     }

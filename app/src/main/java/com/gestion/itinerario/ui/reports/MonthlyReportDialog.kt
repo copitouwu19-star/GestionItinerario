@@ -21,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.gestion.itinerario.R
 import com.gestion.itinerario.ui.theme.Primary40
 import com.gestion.itinerario.ui.theme.Primary80
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -47,6 +48,16 @@ fun MonthlyReportDialog(
     var selected by remember { mutableStateOf(periods.first()) }
     var isGenerating by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    var countdownSecs by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isGenerating) {
+        if (isGenerating) {
+            countdownSecs = 9
+            repeat(9) { delay(1000L); countdownSecs-- }
+        } else {
+            countdownSecs = 0
+        }
+    }
 
     fun generate(share: Boolean) {
         isGenerating = true
@@ -56,8 +67,24 @@ fun MonthlyReportDialog(
                 val (year, month) = selected
                 val file = viewModel.generateMonthlyReport(context, year, month)
                 if (share) ReportPdfGenerator.shareViaWhatsApp(context, file)
+                else       ReportPdfGenerator.openPdf(context, file)
             } catch (e: Exception) {
                 errorMsg = "No se pudo generar el reporte"
+            }
+            isGenerating = false
+        }
+    }
+
+    fun generateExcel() {
+        isGenerating = true
+        errorMsg = null
+        scope.launch {
+            try {
+                val (year, month) = selected
+                val file = viewModel.generateMonthlyExcel(context, year, month)
+                ReportPdfGenerator.shareExcel(context, file)
+            } catch (e: Exception) {
+                errorMsg = "No se pudo generar el Excel"
             }
             isGenerating = false
         }
@@ -104,7 +131,7 @@ fun MonthlyReportDialog(
                     if (isGenerating) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                         Spacer(Modifier.width(8.dp))
-                        Text("Generando…")
+                        Text(if (countdownSecs > 0) "Generando... ${countdownSecs}s" else "Finalizando…")
                     } else {
                         Icon(painterResource(R.drawable.ic_whatsapp), null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
@@ -116,9 +143,30 @@ fun MonthlyReportDialog(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isGenerating
                 ) {
-                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Solo exportar PDF")
+                    if (isGenerating) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (countdownSecs > 0) "Generando... ${countdownSecs}s" else "Finalizando…")
+                    } else {
+                        Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Solo exportar PDF")
+                    }
+                }
+                OutlinedButton(
+                    onClick = { generateExcel() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isGenerating
+                ) {
+                    if (isGenerating) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (countdownSecs > 0) "Generando... ${countdownSecs}s" else "Finalizando…")
+                    } else {
+                        Icon(Icons.Default.TableChart, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Exportar a Excel (CSV)")
+                    }
                 }
                 TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Cerrar") }
             }

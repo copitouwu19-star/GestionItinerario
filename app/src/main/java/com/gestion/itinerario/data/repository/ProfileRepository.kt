@@ -13,6 +13,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -87,16 +89,23 @@ class ProfileRepository @Inject constructor(
     }
 
     suspend fun incrementCounter(): Int {
-        return kotlinx.coroutines.withTimeout(12_000L) {
-            val snap = doc.get().await()
-            val current = snap.getLong("invoiceCounter")?.toInt() ?: 0
-            val next = current + 1
-            // set+merge crea el doc si no existe; update() fallaba cuando no existía
-            doc.set(
-                mapOf("invoiceCounter" to next),
-                com.google.firebase.firestore.SetOptions.merge()
-            ).await()
-            next
+        // 1. Leer el contador (caché primero, luego red, con timeouts cortos)
+        val snap = withTimeoutOrNull(2_000L) {
+            try { doc.get(com.google.firebase.firestore.Source.CACHE).await() } catch (_: Exception) { null }
+        } ?: withTimeoutOrNull(3_000L) {
+            try { doc.get().await() } catch (_: Exception) { null }
         }
+        val current = snap?.getLong("invoiceCounter")?.toInt() ?: 0
+        val next = current + 1
+        // 2. Escribir el nuevo valor; si hay red lenta Firestore lo sincroniza en background
+        try {
+            withTimeout(4_000L) {
+                doc.set(
+                    mapOf("invoiceCounter" to next),
+                    com.google.firebase.firestore.SetOptions.merge()
+                ).await()
+            }
+        } catch (_: Exception) { /* sincronizará cuando haya red */ }
+        return next
     }
 }

@@ -21,8 +21,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,9 +37,13 @@ import com.gestion.itinerario.data.entity.Appointment
 import com.gestion.itinerario.data.entity.AppointmentStatus
 import com.gestion.itinerario.data.entity.Client
 import com.gestion.itinerario.data.entity.Invoice
+import com.gestion.itinerario.data.entity.InvoiceItem
+import com.gestion.itinerario.data.entity.PaymentMethod
+import com.gestion.itinerario.data.entity.PaymentStatus
 import com.gestion.itinerario.data.entity.ServiceOrder
 import com.gestion.itinerario.data.entity.ServiceStatus
 import com.gestion.itinerario.data.entity.ServiceType
+import com.gestion.itinerario.ui.components.UserMenuIconButton
 import com.gestion.itinerario.ui.theme.Primary40
 import com.gestion.itinerario.ui.theme.Primary80
 import com.gestion.itinerario.ui.theme.Secondary40
@@ -71,6 +78,7 @@ private val PHONE_CODES  = listOf("0414", "0424", "0412", "0422", "0416", "0426"
 fun ClientsScreen(
     innerPadding: PaddingValues = PaddingValues(),
     onNavigateToProfile: () -> Unit = {},
+    onLogout: () -> Unit = {},
     viewModel: ClientViewModel = hiltViewModel()
 ) {
     val clients    by viewModel.clients.collectAsStateWithLifecycle()
@@ -99,7 +107,7 @@ fun ClientsScreen(
     }
 
     if (detailClient != null) {
-        ClientDetailScreen(client = detailClient!!, viewModel = viewModel, onBack = { detailClient = null })
+        ClientDetailScreen(client = detailClient!!, viewModel = viewModel, onBack = { detailClient = null }, innerPadding = innerPadding)
         return
     }
 
@@ -109,10 +117,10 @@ fun ClientsScreen(
                 TopAppBar(
                     title = { Text("Clientes", fontWeight = FontWeight.Bold) },
                     actions = {
-                        IconButton(onClick = onNavigateToProfile) {
-                            Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
-                                tint = Primary80, modifier = Modifier.size(28.dp))
-                        }
+                        UserMenuIconButton(
+                            onNavigateToProfile = onNavigateToProfile,
+                            onLogout = onLogout
+                        )
                     }
                 )
             }
@@ -358,6 +366,7 @@ fun ClientDetailScreen(
     client: Client,
     viewModel: ClientViewModel,
     onBack: () -> Unit,
+    innerPadding: PaddingValues = PaddingValues(),
     invoiceViewModel: com.gestion.itinerario.ui.invoice.InvoiceViewModel = hiltViewModel(),
     profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
 ) {
@@ -367,8 +376,10 @@ fun ClientDetailScreen(
     val invoices       by viewModel.getInvoicesForClient(client).collectAsState(initial = emptyList())
     val companyProfile by profileViewModel.profile.collectAsStateWithLifecycle()
     val pdfScope = rememberCoroutineScope()
-    var generatingInvoiceId by remember { mutableStateOf<String?>(null) }
-    var showMoreMenu        by remember { mutableStateOf(false) }
+    var generatingInvoiceId  by remember { mutableStateOf<String?>(null) }
+    var showInvoicesForAppt  by remember { mutableStateOf<String?>(null) }
+    var editingInvoice       by remember { mutableStateOf<Invoice?>(null) }
+    var showMoreMenu         by remember { mutableStateOf(false) }
 
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 
@@ -453,7 +464,10 @@ fun ClientDetailScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp, top = 12.dp, end = 16.dp,
+                bottom = maxOf(innerPadding.calculateBottomPadding(), 12.dp) + 80.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ── Tarjeta de información del cliente ────────────────────────────
@@ -538,7 +552,14 @@ fun ClientDetailScreen(
                 item { EmptyState(icon = Icons.Default.CalendarToday, message = "Sin servicios registrados") }
             } else {
                 itemsIndexed(appointments, key = { _, a -> a.id }) { index, appt ->
-                    AppointmentHistoryCard(appt = appt, sdf = sdf, accentColor = accentColors[index % accentColors.size])
+                    val apptInvoices = invoices.filter { it.appointmentId == appt.id }
+                    AppointmentHistoryCard(
+                        appt = appt,
+                        sdf = sdf,
+                        accentColor = accentColors[index % accentColors.size],
+                        appointmentInvoices = apptInvoices,
+                        onViewInvoices = { showInvoicesForAppt = appt.id }
+                    )
                 }
             }
 
@@ -577,6 +598,53 @@ fun ClientDetailScreen(
                 }
             }
         }
+    }
+
+    // ── Diálogo: facturas de una cita ─────────────────────────────────────────
+    if (showInvoicesForAppt != null) {
+        val apptInvoices = invoices.filter { it.appointmentId == showInvoicesForAppt }
+        AppointmentInvoicesDialog(
+            invoices = apptInvoices,
+            sdf = sdf,
+            isLoadingPdf = generatingInvoiceId != null,
+            onDismiss = { showInvoicesForAppt = null },
+            onViewPdf = { inv ->
+                generatingInvoiceId = inv.id
+                pdfScope.launch {
+                    try {
+                        val file = invoiceViewModel.generatePdf(context, inv, companyProfile)
+                        com.gestion.itinerario.ui.invoice.InvoicePdfGenerator.openPdf(context, file)
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "No se pudo generar el PDF.", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                    generatingInvoiceId = null
+                }
+            },
+            onWhatsApp = { inv ->
+                pdfScope.launch {
+                    try {
+                        val file = invoiceViewModel.generatePdf(context, inv, companyProfile)
+                        com.gestion.itinerario.ui.invoice.InvoicePdfGenerator.shareViaWhatsAppTo(context, file, client.phone)
+                    } catch (_: Exception) {
+                        android.widget.Toast.makeText(context, "No se pudo generar el PDF.", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
+            onEdit = { inv ->
+                editingInvoice = inv
+                showInvoicesForAppt = null
+            }
+        )
+    }
+    if (editingInvoice != null) {
+        InvoiceUpdateDialog(
+            invoice = editingInvoice!!,
+            onDismiss = { editingInvoice = null },
+            onSave = { updated ->
+                invoiceViewModel.updateInvoice(updated)
+                editingInvoice = null
+            }
+        )
     }
 }
 
@@ -730,7 +798,13 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentC
 
 // ─── Tarjeta historial cita ───────────────────────────────────────────────────
 @Composable
-private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat, accentColor: Color = Tertiary40) {
+private fun AppointmentHistoryCard(
+    appt: Appointment,
+    sdf: SimpleDateFormat,
+    accentColor: Color = Tertiary40,
+    appointmentInvoices: List<Invoice> = emptyList(),
+    onViewInvoices: () -> Unit = {}
+) {
     val (statusColor, statusLabel) = when (appt.status) {
         AppointmentStatus.SCHEDULED   -> StatusPending   to "PROGRAMADA"
         AppointmentStatus.IN_PROGRESS -> StatusInRepair  to "EN PROCESO"
@@ -797,6 +871,23 @@ private fun AppointmentHistoryCard(appt: Appointment, sdf: SimpleDateFormat, acc
                     Text(appt.notes,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (appointmentInvoices.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onViewInvoices,
+                        modifier = Modifier.align(Alignment.End),
+                        shape = RoundedCornerShape(50),
+                        border = BorderStroke(1.dp, Primary40)
+                    ) {
+                        Icon(Icons.Default.Receipt, null, modifier = Modifier.size(15.dp), tint = Primary40)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Ver facturas (${appointmentInvoices.size})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Primary40
+                        )
+                    }
+                }
             }
         }
     }
@@ -868,6 +959,219 @@ private fun InvoiceHistoryCard(
                     }
                 }
             }
+        }
+    }
+}
+
+// ─── Diálogo: lista de facturas de una cita ───────────────────────────────────
+@Composable
+private fun AppointmentInvoicesDialog(
+    invoices: List<Invoice>,
+    sdf: SimpleDateFormat,
+    isLoadingPdf: Boolean,
+    onDismiss: () -> Unit,
+    onViewPdf: (Invoice) -> Unit,
+    onWhatsApp: (Invoice) -> Unit,
+    onEdit: (Invoice) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Primary40),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.Receipt, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
+                    Column {
+                        Text("Facturas del servicio", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("${invoices.size} factura(s)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                HorizontalDivider()
+
+                invoices.forEach { inv ->
+                    val (pColor, pLabel) = when (inv.paymentStatus) {
+                        PaymentStatus.PAID    -> StatusCompleted to "PAGADO"
+                        PaymentStatus.PENDING -> Color(0xFFE65100) to "PENDIENTE"
+                        else                  -> MaterialTheme.colorScheme.onSurfaceVariant to "SIN ESTADO"
+                    }
+                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(inv.invoiceNumber, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                                Surface(shape = RoundedCornerShape(6.dp), color = pColor.copy(alpha = 0.14f)) {
+                                    Text(pLabel, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = pColor)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("\$${String.format("%.2f", inv.totalAmount)}",
+                                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                                    color = Primary40, modifier = Modifier.weight(1f))
+                                Text(sdf.format(java.util.Date(inv.createdAt)),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedButton(
+                                    onClick = { onViewPdf(inv) }, enabled = !isLoadingPdf,
+                                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(50)
+                                ) {
+                                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(14.dp), tint = Primary80)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("PDF", style = MaterialTheme.typography.labelSmall)
+                                }
+                                OutlinedButton(
+                                    onClick = { onWhatsApp(inv) },
+                                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(50)
+                                ) {
+                                    Icon(androidx.compose.ui.res.painterResource(com.gestion.itinerario.R.drawable.ic_whatsapp),
+                                        null, modifier = Modifier.size(14.dp), tint = WhatsAppGreen)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("WS", style = MaterialTheme.typography.labelSmall)
+                                }
+                                Button(
+                                    onClick = { onEdit(inv) },
+                                    modifier = Modifier.weight(1f), shape = RoundedCornerShape(50),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .background(Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50))
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text("Editar", style = MaterialTheme.typography.labelSmall, color = Color.White) }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Cerrar") }
+            }
+        }
+    }
+}
+
+// ─── Diálogo: actualizar factura existente ────────────────────────────────────
+@Composable
+private fun InvoiceUpdateDialog(invoice: Invoice, onDismiss: () -> Unit, onSave: (Invoice) -> Unit) {
+    val baseAmount = invoice.items.firstOrNull()?.unitPrice ?: (invoice.totalAmount / (1.0 + invoice.taxRate / 100.0))
+    var subtotalStr    by remember { mutableStateOf(String.format("%.2f", baseAmount)) }
+    var taxRateStr     by remember { mutableStateOf(String.format("%.0f", invoice.taxRate)) }
+    var paymentMethod  by remember { mutableStateOf(invoice.paymentMethod) }
+    var paymentStatus  by remember { mutableStateOf(invoice.paymentStatus) }
+    var paymentTerms   by remember { mutableStateOf(invoice.paymentTerms) }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Primary40),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
+                    Column {
+                        Text("Actualizar Factura", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(invoice.invoiceNumber, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                HorizontalDivider()
+
+                OutlinedTextField(
+                    value = subtotalStr, onValueChange = { subtotalStr = it },
+                    label = { Text("Subtotal") },
+                    prefix = { Text("$") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = taxRateStr, onValueChange = { taxRateStr = it },
+                    label = { Text("IVA (%)") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Text("Método de pago", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(PaymentMethod.CASH to "Efectivo", PaymentMethod.TRANSFER to "Transferencia", PaymentMethod.NONE to "Sin método").forEach { (m, lbl) ->
+                        InvoicePill(label = lbl, selected = paymentMethod == m, onClick = { paymentMethod = m }, modifier = Modifier.weight(1f))
+                    }
+                }
+
+                Text("Estado de pago", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(PaymentStatus.PAID to "Pagado", PaymentStatus.PENDING to "Pendiente", PaymentStatus.NONE to "Sin estado").forEach { (s, lbl) ->
+                        InvoicePill(label = lbl, selected = paymentStatus == s, onClick = { paymentStatus = s }, modifier = Modifier.weight(1f))
+                    }
+                }
+
+                OutlinedTextField(
+                    value = paymentTerms, onValueChange = { paymentTerms = it },
+                    label = { Text("Condición de pago") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                HorizontalDivider()
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f), shape = RoundedCornerShape(50)) { Text("Cancelar") }
+                    Button(
+                        onClick = {
+                            val subtotal = subtotalStr.toDoubleOrNull() ?: baseAmount
+                            val tax = taxRateStr.toDoubleOrNull() ?: invoice.taxRate
+                            val total = subtotal + subtotal * (tax / 100.0)
+                            val updatedItems = listOf(
+                                invoice.items.firstOrNull()?.copy(unitPrice = subtotal, amount = subtotal)
+                                    ?: InvoiceItem(description = invoice.serviceDescription, quantity = 1.0, unit = "Servicio", unitPrice = subtotal, amount = subtotal)
+                            )
+                            onSave(invoice.copy(totalAmount = total, taxRate = tax, paymentMethod = paymentMethod, paymentStatus = paymentStatus, paymentTerms = paymentTerms.trim(), items = updatedItems))
+                        },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                                .background(Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50))
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) { Text("Actualizar", color = Color.White, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InvoicePill(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(50), color = if (selected) Color.Transparent else Color(0xFFF0F0F0), modifier = modifier) {
+        Box(
+            modifier = Modifier.fillMaxWidth()
+                .then(if (selected) Modifier.background(Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50)) else Modifier)
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) Color.White else Color(0xFF6B6B6B))
         }
     }
 }

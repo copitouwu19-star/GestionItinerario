@@ -7,9 +7,6 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.util.Base64
 import androidx.core.content.FileProvider
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.qrcode.QRCodeWriter
 import com.gestion.itinerario.data.entity.CompanyProfile
 import com.gestion.itinerario.data.entity.Invoice
 import com.gestion.itinerario.data.entity.PaymentMethod
@@ -31,7 +28,6 @@ object InvoicePdfGenerator {
 
         val boldPaint = Paint().apply { typeface = Typeface.DEFAULT_BOLD; isAntiAlias = true }
         val normalPaint = Paint().apply { typeface = Typeface.DEFAULT; isAntiAlias = true }
-        val smallPaint = Paint().apply { typeface = Typeface.DEFAULT; textSize = 10f; isAntiAlias = true }
         val titlePaint = Paint().apply { typeface = Typeface.DEFAULT_BOLD; textSize = 20f; color = Color.rgb(21, 101, 192); isAntiAlias = true }
         val headerPaint = Paint().apply { typeface = Typeface.DEFAULT_BOLD; textSize = 12f; color = Color.WHITE; isAntiAlias = true }
         val linePaint = Paint().apply { color = Color.LTGRAY; strokeWidth = 1f }
@@ -42,50 +38,49 @@ object InvoicePdfGenerator {
         val marginR = 555f
         val pageW = 595f
 
-        // ── Encabezado azul ──────────────────────────────────────────────────
-        canvas.drawRect(0f, 0f, pageW, 80f, bluePaint)
+        // ── Encabezado: Logo izquierda + Datos empresa derecha ─────────────────
+        val themeBlue = Color.rgb(21, 101, 192)
+        var infoX = marginL
 
-        // Logo empresa (esquina superior derecha) — si existe
-        val logoAreaRight = pageW - marginL
-        val logoAreaLeft: Float
+        // Logo empresa (lado izquierdo)
         if (logoBitmap != null) {
             val logoH = 60f
             val logoW = (logoBitmap.width.toFloat() / logoBitmap.height.toFloat()) * logoH
             val scaledLogo = Bitmap.createScaledBitmap(logoBitmap, logoW.toInt(), logoH.toInt(), true)
-            val logoLeft = pageW - logoW - marginL
-            canvas.drawBitmap(scaledLogo, logoLeft, 10f, null)
-            logoAreaLeft = logoLeft - 8f
-        } else {
-            logoAreaLeft = pageW - marginL
+            canvas.drawBitmap(scaledLogo, marginL, 10f, null)
+            infoX = marginL + logoW + 14f
         }
 
-        // Nombre empresa (izquierda)
-        titlePaint.color = Color.WHITE
-        titlePaint.textSize = 18f
-        canvas.drawText(profile.companyName.ifBlank { "Mi Empresa" }, marginL, 35f, titlePaint)
-        normalPaint.color = Color.WHITE; normalPaint.textSize = 10f
+        // Nombre empresa a la derecha del logo
         val taxIdToShow = invoice.companyTaxId.ifBlank { profile.taxId }
-        val line2 = buildString {
-            if (taxIdToShow.isNotBlank()) append("NIT: $taxIdToShow")
+        titlePaint.color = themeBlue; titlePaint.textSize = 17f
+        canvas.drawText(profile.companyName.ifBlank { "Mi Empresa" }, infoX, 30f, titlePaint)
+
+        // RIF + Tel en la misma línea
+        normalPaint.color = Color.DKGRAY; normalPaint.textSize = 10f
+        val rifTelLine = buildString {
+            if (taxIdToShow.isNotBlank()) append("RIF: $taxIdToShow")
             if (profile.phone.isNotBlank()) { if (isNotEmpty()) append("  ·  "); append("Tel: ${profile.phone}") }
         }
-        if (line2.isNotBlank()) canvas.drawText(line2, marginL, 52f, normalPaint)
-        if (profile.address.isNotBlank()) canvas.drawText(profile.address.take(50), marginL, 66f, normalPaint)
+        if (rifTelLine.isNotBlank()) canvas.drawText(rifTelLine, infoX, 46f, normalPaint)
+        if (profile.address.isNotBlank()) {
+            normalPaint.textSize = 9f
+            canvas.drawText(profile.address.take(60), infoX, 60f, normalPaint)
+        }
 
-        // Número de factura — se ubica a la izquierda del logo si hay logo, o al borde derecho
-        boldPaint.color = Color.WHITE; boldPaint.textSize = 12f
-        val facLabel = "FACTURA DE SERVICIO"
-        val facW = boldPaint.measureText(facLabel)
-        val facX = if (logoBitmap != null) marginL + (logoAreaLeft - marginL - facW) / 2f
-                   else logoAreaRight - facW
-        canvas.drawText(facLabel, facX.coerceAtLeast(marginL), 35f, boldPaint)
-        normalPaint.textSize = 11f; normalPaint.color = Color.rgb(220, 240, 255)
-        val numW = normalPaint.measureText(invoice.invoiceNumber)
-        canvas.drawText(invoice.invoiceNumber, facX.coerceAtLeast(marginL), 52f, normalPaint)
+        // Línea divisora del tema
+        canvas.drawLine(marginL, 76f, marginR, 76f, linePaint.apply { color = themeBlue; strokeWidth = 2f })
+
+        // Factura de Servicio + Número + Fecha — todos alineados a la izquierda
+        boldPaint.color = themeBlue; boldPaint.textSize = 13f
+        canvas.drawText("FACTURA DE SERVICIO", marginL, 93f, boldPaint)
+        normalPaint.color = Color.rgb(60, 60, 60); normalPaint.textSize = 11f
+        canvas.drawText(invoice.invoiceNumber, marginL, 108f, normalPaint)
+        normalPaint.color = Color.DKGRAY; normalPaint.textSize = 10f
         val dateStr = "Fecha: ${sdf.format(Date(invoice.endDate.takeIf { it > 0 } ?: invoice.createdAt))}"
-        canvas.drawText(dateStr, facX.coerceAtLeast(marginL), 66f, normalPaint)
+        canvas.drawText(dateStr, marginL, 121f, normalPaint)
 
-        y = 100f
+        y = 138f
 
         // ── Datos del cliente ────────────────────────────────────────────────
         boldPaint.color = Color.rgb(21, 101, 192); boldPaint.textSize = 12f
@@ -193,35 +188,31 @@ object InvoicePdfGenerator {
             y += 8f
             boldPaint.color = Color.rgb(21, 101, 192); boldPaint.textSize = 11f
             canvas.drawText("FIRMA DEL CLIENTE", marginL, y, boldPaint)
-            y += 8f
+            y += 12f
+            val sigAreaH = 68f
+            val lineY = y + sigAreaH
+            canvas.drawLine(marginL, lineY, marginL + 160f, lineY, linePaint.apply { color = Color.DKGRAY; strokeWidth = 1f })
             try {
                 val sigBytes = Base64.decode(invoice.clientSignature, Base64.DEFAULT)
-                val sigBmp = BitmapFactory.decodeByteArray(sigBytes, 0, sigBytes.size)
-                if (sigBmp != null) {
-                    val sigH = 80f
-                    val sigW = (sigBmp.width.toFloat() / sigBmp.height.toFloat()) * sigH
-                    canvas.drawBitmap(
-                        Bitmap.createScaledBitmap(sigBmp, sigW.toInt(), sigH.toInt(), true),
-                        marginL, y, null
-                    )
+                val rawBmp = BitmapFactory.decodeByteArray(sigBytes, 0, sigBytes.size)
+                if (rawBmp != null) {
+                    // Recortar espacio en blanco alrededor del trazo real
+                    val trimmed = trimSignatureBitmap(rawBmp)
+                    // Escalar para que quepa en max 160×(sigAreaH-8) preservando relación
+                    val maxW = 160f; val maxH = sigAreaH - 8f
+                    val scale = minOf(maxW / trimmed.width, maxH / trimmed.height)
+                    val sW = (trimmed.width * scale).toInt().coerceAtLeast(1)
+                    val sH = (trimmed.height * scale).toInt().coerceAtLeast(1)
+                    val scaledSig = Bitmap.createScaledBitmap(trimmed, sW, sH, true)
+                    // Posicionar: borde inferior del bitmap = línea de firma
+                    canvas.drawBitmap(scaledSig, marginL, lineY - sH - 2f, null)
                 }
             } catch (_: Exception) {}
-            y += 90f
-            canvas.drawLine(marginL, y, marginL + 160f, y, linePaint.apply { color = Color.DKGRAY; strokeWidth = 1f })
-            y += 12f
+            y = lineY + 14f
             normalPaint.color = Color.DKGRAY; normalPaint.textSize = 9f
             canvas.drawText(invoice.clientName, marginL, y, normalPaint)
             y += 20f
         }
-
-        // ── QR Code ──────────────────────────────────────────────────────────
-        try {
-            val qrContent = "Factura:${invoice.invoiceNumber}|Total:\$${String.format("%.2f",invoice.totalAmount)}|Cliente:${invoice.clientName}"
-            val qrBmp = generateQrBitmap(qrContent, 120)
-            canvas.drawBitmap(qrBmp, marginR - 130f, page.info.pageHeight - 160f, null)
-            smallPaint.color = Color.DKGRAY
-            canvas.drawText("Escanea para verificar", marginR - 130f, page.info.pageHeight - 36f, smallPaint)
-        } catch (_: Exception) {}
 
         // ── Pie de página ─────────────────────────────────────────────────────
         normalPaint.color = Color.rgb(100, 100, 100); normalPaint.textSize = 8f
@@ -240,13 +231,30 @@ object InvoicePdfGenerator {
         return file
     }
 
-    private fun generateQrBitmap(content: String, size: Int): Bitmap {
-        val hints = mapOf(EncodeHintType.MARGIN to 1)
-        val bits = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, size, size, hints)
-        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
-        for (x in 0 until size) for (y in 0 until size)
-            bmp.setPixel(x, y, if (bits[x, y]) Color.BLACK else Color.WHITE)
-        return bmp
+    /** Recorta los píxeles blancos/transparentes del borde del bitmap de firma,
+     *  dejando solo el trazo real con un pequeño padding. */
+    private fun trimSignatureBitmap(bmp: Bitmap): Bitmap {
+        val pixels = IntArray(bmp.width * bmp.height)
+        bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+        var minX = bmp.width; var minY = bmp.height; var maxX = 0; var maxY = 0
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            // Considerar no-blanco y no-transparente como trazo real
+            if (android.graphics.Color.alpha(p) > 20 &&
+                !(android.graphics.Color.red(p) > 240 && android.graphics.Color.green(p) > 240 && android.graphics.Color.blue(p) > 240)) {
+                val x = i % bmp.width; val y = i / bmp.width
+                if (x < minX) minX = x; if (y < minY) minY = y
+                if (x > maxX) maxX = x; if (y > maxY) maxY = y
+            }
+        }
+        // Si no encontramos trazo, devolvemos el bitmap original
+        if (maxX <= minX || maxY <= minY) return bmp
+        val pad = 10
+        val x0 = (minX - pad).coerceAtLeast(0)
+        val y0 = (minY - pad).coerceAtLeast(0)
+        val w = (maxX - x0 + pad * 2).coerceAtMost(bmp.width - x0)
+        val h = (maxY - y0 + pad * 2).coerceAtMost(bmp.height - y0)
+        return Bitmap.createBitmap(bmp, x0, y0, w, h)
     }
 
     /** Abre el PDF generado con la app visor de PDF predeterminada del teléfono. */

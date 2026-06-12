@@ -27,6 +27,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.gestion.itinerario.R
 import com.gestion.itinerario.data.entity.*
@@ -69,6 +70,16 @@ fun InvoiceCreationDialog(
     var signatureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCreating      by remember { mutableStateOf(false) }
     var createdInvoice  by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var countdownSecs   by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isCreating) {
+        if (isCreating) {
+            countdownSecs = 9
+            repeat(9) { delay(1000L); countdownSecs-- }
+        } else {
+            countdownSecs = 0
+        }
+    }
 
     var currentTotalStr   by remember { mutableStateOf(if (totalAmount > 0.0) String.format("%.2f", totalAmount) else "") }
     var currentTaxRateStr by remember { mutableStateOf("0") }
@@ -182,7 +193,10 @@ fun InvoiceCreationDialog(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 CircularProgressIndicator(modifier = Modifier.size(18.dp),
                                                     strokeWidth = 2.dp, color = Color.White)
-                                                Text("Generando…", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                                Text(
+                                                    if (countdownSecs > 0) "Generando… ${countdownSecs}s" else "Finalizando…",
+                                                    color = Color.White, fontWeight = FontWeight.SemiBold
+                                                )
                                             }
                                         } else {
                                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -494,6 +508,21 @@ private fun InvoiceCreatedView(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var isGeneratingPdf by remember { mutableStateOf(false) }
     var isGeneratingWa  by remember { mutableStateOf(false) }
+    var countdownWa  by remember { mutableStateOf(0) }
+    var countdownPdf by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isGeneratingWa) {
+        if (isGeneratingWa) {
+            countdownWa = 5
+            repeat(5) { delay(1000L); countdownWa-- }
+        } else countdownWa = 0
+    }
+    LaunchedEffect(isGeneratingPdf) {
+        if (isGeneratingPdf) {
+            countdownPdf = 5
+            repeat(5) { delay(1000L); countdownPdf-- }
+        } else countdownPdf = 0
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -561,7 +590,7 @@ private fun InvoiceCreatedView(
                 if (isGeneratingWa) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Generando…")
+                    Text(if (countdownWa > 0) "Generando… ${countdownWa}s" else "Finalizando…")
                 } else {
                     Icon(painterResource(R.drawable.ic_whatsapp), null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
@@ -595,7 +624,7 @@ private fun InvoiceCreatedView(
                 if (isGeneratingPdf) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Generando…")
+                    Text(if (countdownPdf > 0) "Generando… ${countdownPdf}s" else "Finalizando…")
                 } else {
                     Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))

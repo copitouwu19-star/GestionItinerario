@@ -48,7 +48,7 @@ val bottomNavItems = listOf(
     NavItem(Routes.CLIENTS,    "Clientes",  Icons.Default.People),
     NavItem(Routes.SERVICES,   "Servicios", Icons.Default.Build),
     NavItem(Routes.AGENDA,     "Agenda",    Icons.Default.CalendarMonth),
-    NavItem(Routes.REMINDERS,  "Recordar",  Icons.Default.NotificationsActive),
+    NavItem(Routes.REMINDERS,  "Mantenimiento",  Icons.Default.Build),
 )
 
 @AndroidEntryPoint
@@ -70,11 +70,13 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Pedir exención de optimización de batería para que las alarmas lleguen a tiempo.
-        // Sin esto, en muchos Android (Samsung, Xiaomi, etc.) el sistema mata las alarmas programadas.
+        // Pedir exención de batería solo una vez al instalar la app
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            val askedBefore = prefs.getBoolean("battery_opt_asked", false)
             val pm = getSystemService(POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            if (!askedBefore && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                prefs.edit().putBoolean("battery_opt_asked", true).apply()
                 startActivity(
                     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                         data = Uri.parse("package:$packageName")

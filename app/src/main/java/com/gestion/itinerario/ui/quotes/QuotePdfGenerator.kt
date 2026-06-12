@@ -28,62 +28,61 @@ object QuotePdfGenerator {
         val normalPaint = Paint().apply { typeface = Typeface.DEFAULT; isAntiAlias = true }
         val headerPaint = Paint().apply { typeface = Typeface.DEFAULT_BOLD; textSize = 10f; color = Color.WHITE; isAntiAlias = true }
         val linePaint   = Paint().apply { color = Color.LTGRAY; strokeWidth = 1f }
-        val darkPaint   = Paint().apply { color = Color.rgb(124, 58, 237) }  // morado primario
+        val themeBlue   = Color.rgb(21, 101, 192)
 
         var y = 40f
         val marginL = 40f
         val marginR = 555f
-        val pageW   = 595f
 
-        // ── Encabezado neutro (negro/gris oscuro) ────────────────────────────
-        canvas.drawRect(0f, 0f, pageW, 80f, darkPaint)
+        // ── Encabezado: Logo izquierda + Datos empresa derecha ─────────────────
+        var infoX = marginL
 
-        // Logo empresa (esquina superior derecha)
         if (logoBitmap != null) {
             val logoH = 60f
             val logoW = (logoBitmap.width.toFloat() / logoBitmap.height.toFloat()) * logoH
             val scaledLogo = Bitmap.createScaledBitmap(logoBitmap, logoW.toInt(), logoH.toInt(), true)
-            canvas.drawBitmap(scaledLogo, pageW - logoW - marginL, 10f, null)
+            canvas.drawBitmap(scaledLogo, marginL, 10f, null)
+            infoX = marginL + logoW + 14f
         }
 
-        // Nombre empresa izquierda
-        boldPaint.color = Color.WHITE; boldPaint.textSize = 18f
-        canvas.drawText(profile.companyName.ifBlank { "Mi Empresa" }, marginL, 35f, boldPaint)
-        normalPaint.color = Color.rgb(200, 200, 200); normalPaint.textSize = 10f
+        boldPaint.color = themeBlue; boldPaint.textSize = 17f
+        canvas.drawText(profile.companyName.ifBlank { "Mi Empresa" }, infoX, 30f, boldPaint)
+        normalPaint.color = Color.DKGRAY; normalPaint.textSize = 10f
         val taxLine = buildString {
             if (profile.taxId.isNotBlank()) append("NIT: ${profile.taxId}")
             if (profile.phone.isNotBlank()) { if (isNotEmpty()) append("  ·  "); append("Tel: ${profile.phone}") }
         }
-        if (taxLine.isNotBlank()) canvas.drawText(taxLine, marginL, 52f, normalPaint)
-        if (profile.address.isNotBlank()) canvas.drawText(profile.address.take(50), marginL, 66f, normalPaint)
+        if (taxLine.isNotBlank()) canvas.drawText(taxLine, infoX, 46f, normalPaint)
+        if (profile.address.isNotBlank()) {
+            normalPaint.textSize = 9f
+            canvas.drawText(profile.address.take(60), infoX, 60f, normalPaint)
+        }
 
-        // Número cotización derecha
-        boldPaint.color = Color.WHITE; boldPaint.textSize = 12f
-        val label = "COTIZACIÓN DE SERVICIO"
-        val labelX = if (logoBitmap != null) marginL + (pageW - marginL * 2 - boldPaint.measureText(label)) / 2f
-                     else marginR - boldPaint.measureText(label)
-        canvas.drawText(label, labelX.coerceAtLeast(marginL), 35f, boldPaint)
-        normalPaint.color = Color.rgb(210, 210, 210); normalPaint.textSize = 11f
-        canvas.drawText(quote.quoteNumber, labelX.coerceAtLeast(marginL), 52f, normalPaint)
-        val dateStr = "Fecha: ${sdf.format(Date(quote.createdAt))}"
-        canvas.drawText(dateStr, labelX.coerceAtLeast(marginL), 66f, normalPaint)
+        canvas.drawLine(marginL, 76f, marginR, 76f, linePaint.apply { color = themeBlue; strokeWidth = 2f })
 
-        y = 100f
+        boldPaint.color = themeBlue; boldPaint.textSize = 13f
+        canvas.drawText("COTIZACIÓN DE SERVICIO", marginL, 93f, boldPaint)
+        normalPaint.color = Color.rgb(60, 60, 60); normalPaint.textSize = 11f
+        canvas.drawText(quote.quoteNumber, marginL, 108f, normalPaint)
+        normalPaint.color = Color.DKGRAY; normalPaint.textSize = 10f
+        canvas.drawText("Fecha: ${sdf.format(Date(quote.createdAt))}", marginL, 121f, normalPaint)
+
+        y = 138f
 
         // ── Validez ───────────────────────────────────────────────────────────
         if (quote.validUntil > 0L) {
             canvas.drawRect(marginL, y, marginR, y + 26f, Paint().apply { color = Color.rgb(245, 245, 245) })
-            boldPaint.color = Color.rgb(100, 50, 180); boldPaint.textSize = 10f
+            boldPaint.color = themeBlue; boldPaint.textSize = 10f
             canvas.drawText("Esta cotización es válida hasta el ${sdf.format(Date(quote.validUntil))}",
                 marginL + 8f, y + 17f, boldPaint)
             y += 26f + 14f
         }
 
         // ── Datos del cliente ─────────────────────────────────────────────────
-        boldPaint.color = Color.rgb(100, 50, 180); boldPaint.textSize = 12f
+        boldPaint.color = themeBlue; boldPaint.textSize = 12f
         canvas.drawText("DATOS DEL CLIENTE", marginL, y, boldPaint)
         y += 4f
-        canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = Color.rgb(100, 50, 180); strokeWidth = 2f })
+        canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = themeBlue; strokeWidth = 2f })
         y += 16f
         normalPaint.color = Color.BLACK; normalPaint.textSize = 11f
         canvas.drawText("Cliente: ${quote.clientName}", marginL, y, normalPaint); y += 16f
@@ -94,17 +93,17 @@ object QuotePdfGenerator {
         y += 8f
 
         // ── Tabla de ítems ────────────────────────────────────────────────────
-        boldPaint.color = Color.rgb(100, 50, 180); boldPaint.textSize = 12f
+        boldPaint.color = themeBlue; boldPaint.textSize = 12f
         canvas.drawText("DETALLE ESTIMADO", marginL, y, boldPaint)
         y += 6f
-        canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = Color.rgb(100, 50, 180); strokeWidth = 2f })
+        canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = themeBlue; strokeWidth = 2f })
         y += 4f
 
         val colQtyX = marginR - 220f
         val colUPX  = marginR - 150f
         val colTotX = marginR - 75f
 
-        canvas.drawRect(marginL, y, marginR, y + 24f, Paint().apply { color = Color.rgb(124, 58, 237) })
+        canvas.drawRect(marginL, y, marginR, y + 24f, Paint().apply { color = themeBlue })
         headerPaint.textSize = 10f
         canvas.drawText("DESCRIPCIÓN",  marginL + 8f, y + 16f, headerPaint)
         canvas.drawText("CANT.",        colQtyX,      y + 16f, headerPaint)
@@ -113,13 +112,13 @@ object QuotePdfGenerator {
         y += 28f
 
         quote.items.forEachIndexed { i, item ->
-            val bg = if (i % 2 == 0) Color.rgb(248, 248, 248) else Color.WHITE
+            val bg = if (i % 2 == 0) Color.rgb(240, 248, 255) else Color.WHITE
             canvas.drawRect(marginL, y - 4f, marginR, y + 16f, Paint().apply { color = bg })
             normalPaint.color = Color.BLACK; normalPaint.textSize = 10f
             canvas.drawText(item.description.take(42), marginL + 8f, y + 10f, normalPaint)
             canvas.drawText(String.format("%.0f", item.quantity),  colQtyX, y + 10f, normalPaint)
             canvas.drawText(String.format("%.2f", item.unitPrice), colUPX,  y + 10f, normalPaint)
-            canvas.drawText("$${String.format("%.2f", item.amount)}", colTotX, y + 10f, normalPaint)
+            canvas.drawText("\$${String.format("%.2f", item.amount)}", colTotX, y + 10f, normalPaint)
             y += 20f
         }
         canvas.drawLine(marginL, y, marginR, y, linePaint.apply { color = Color.LTGRAY; strokeWidth = 1f })
@@ -128,10 +127,10 @@ object QuotePdfGenerator {
         // ── Total estimado ────────────────────────────────────────────────────
         val boxW = 220f
         val boxL = marginR - boxW
-        canvas.drawRect(boxL, y, marginR, y + 30f, Paint().apply { color = Color.rgb(124, 58, 237) })
+        canvas.drawRect(boxL, y, marginR, y + 30f, Paint().apply { color = themeBlue })
         headerPaint.textSize = 13f
         canvas.drawText("TOTAL ESTIMADO", boxL + 10f, y + 20f, headerPaint)
-        val totalStr = "$${String.format("%.2f", quote.totalAmount)}"
+        val totalStr = "\$${String.format("%.2f", quote.totalAmount)}"
         canvas.drawText(totalStr, marginR - headerPaint.measureText(totalStr) - 10f, y + 20f, headerPaint)
         y += 30f + 20f
 
@@ -155,7 +154,7 @@ object QuotePdfGenerator {
 
         // ── Firma del cliente ─────────────────────────────────────────────────
         if (quote.clientSignature.isNotBlank()) {
-            boldPaint.color = Color.rgb(100, 50, 180); boldPaint.textSize = 11f
+            boldPaint.color = themeBlue; boldPaint.textSize = 11f
             canvas.drawText("FIRMA DE APROBACIÓN DEL CLIENTE", marginL, y, boldPaint)
             y += 8f
             try {

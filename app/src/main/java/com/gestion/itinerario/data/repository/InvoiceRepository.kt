@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,11 +37,15 @@ class InvoiceRepository @Inject constructor(private val db: FirebaseFirestore) {
 
     suspend fun save(invoice: Invoice): String {
         val ref = if (invoice.id.isEmpty()) col.document() else col.document(invoice.id)
-        ref.set(invoice.toMap()).await()
+        // Firebase Task sigue corriendo en background aunque se acabe el timeout;
+        // Firestore sincronizará cuando haya red. Retornamos el ID sin esperar ACK del servidor.
+        try { withTimeout(5_000L) { ref.set(invoice.toMap()).await() } } catch (_: Exception) {}
         return ref.id
     }
 
-    suspend fun delete(invoice: Invoice) { col.document(invoice.id).delete().await() }
+    suspend fun delete(invoice: Invoice) {
+        try { withTimeout(5_000L) { col.document(invoice.id).delete().await() } } catch (_: Exception) {}
+    }
 }
 
 @Suppress("UNCHECKED_CAST")
