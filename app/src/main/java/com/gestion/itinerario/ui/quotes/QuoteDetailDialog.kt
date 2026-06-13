@@ -34,9 +34,6 @@ import com.gestion.itinerario.data.entity.QuoteStatus
 import com.gestion.itinerario.ui.invoice.SignaturePad
 import com.gestion.itinerario.ui.invoice.SignatureLine
 import com.gestion.itinerario.ui.invoice.signatureLinesToBitmap
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
-import com.gestion.itinerario.ui.theme.Secondary40
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import com.gestion.itinerario.ui.theme.StatusLowStock
 import kotlinx.coroutines.launch
@@ -88,7 +85,7 @@ fun QuoteDetailDialog(
                             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                                 Box(modifier = Modifier.width(5.dp).fillMaxHeight()
                                     .background(
-                                        Brush.linearGradient(listOf(Primary40, Secondary40)),
+                                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                                         RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
                                     ))
                                 Column(modifier = Modifier.padding(14.dp).weight(1f),
@@ -201,7 +198,7 @@ fun QuoteDetailDialog(
                                         Row(verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             modifier = Modifier.weight(1f)) {
-                                            Box(modifier = Modifier.size(6.dp).background(Primary40, CircleShape))
+                                            Box(modifier = Modifier.size(6.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
                                             Text("${item.description} (x${String.format("%.0f", item.quantity)})",
                                                 style = MaterialTheme.typography.bodyMedium)
                                         }
@@ -218,7 +215,7 @@ fun QuoteDetailDialog(
                                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                     Text("$${String.format("%.2f", current.totalAmount)}",
                                         style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold, color = Primary80)
+                                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -257,7 +254,7 @@ fun QuoteDetailDialog(
                                 onClick = { showApproval = true },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(50),
-                                colors = ButtonDefaults.buttonColors(containerColor = Primary40)
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Icon(Icons.Default.Draw, null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
@@ -372,7 +369,7 @@ private fun QuoteApprovalDialog(
         ) {
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Draw, null, tint = Primary80, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Draw, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     Text("Respuesta del cliente", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
                 Text("Pide al cliente que firme directamente sobre la pantalla para confirmar su decisión sobre la cotización ${quote.quoteNumber}.",

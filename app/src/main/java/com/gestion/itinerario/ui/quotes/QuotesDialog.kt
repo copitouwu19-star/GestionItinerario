@@ -21,9 +21,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gestion.itinerario.data.entity.Quote
 import com.gestion.itinerario.data.entity.QuoteStatus
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
-import com.gestion.itinerario.ui.theme.Secondary40
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import com.gestion.itinerario.ui.theme.StatusLowStock
 import com.gestion.itinerario.ui.theme.StatusPending
@@ -77,7 +74,7 @@ fun QuotesDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.RequestQuote, null, tint = Primary80, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.RequestQuote, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                             Text("Cotizaciones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         }
                         IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) }
@@ -94,7 +91,7 @@ fun QuotesDialog(
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            Brush.linearGradient(listOf(Primary40, Secondary40)),
+                                            Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                                             RoundedCornerShape(50)
                                         )
                                         .padding(horizontal = 14.dp, vertical = 7.dp),
@@ -150,7 +147,7 @@ fun QuotesDialog(
                     onClick = { showCreate = true },
                     icon = { Icon(Icons.Default.Add, null, tint = Color.White) },
                     text = { Text("Nueva cotización", color = Color.White, fontWeight = FontWeight.Bold) },
-                    containerColor = Primary40,
+                    containerColor = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)
                 )
             }
@@ -183,7 +180,7 @@ private fun QuoteCard(quote: Quote, onClick: () -> Unit) {
                 Text(quote.quoteNumber,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Primary40)
+                    color = MaterialTheme.colorScheme.primary)
                 Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.15f)) {
                     Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
@@ -211,7 +208,7 @@ private fun QuoteCard(quote: Quote, onClick: () -> Unit) {
                 }
                 Text("$${String.format("%.2f", quote.totalAmount)}",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold, color = Primary80)
+                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(
@@ -220,7 +217,7 @@ private fun QuoteCard(quote: Quote, onClick: () -> Unit) {
                 ) {
                     Text("VER DETALLE >",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Primary40,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold)
                 }
             }

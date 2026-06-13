@@ -98,7 +98,7 @@ fun InventoryScreen(
                 // FAB principal: nuevo producto
                 FloatingActionButton(
                     onClick = { showAddDialog = true },
-                    containerColor = Primary40
+                    containerColor = MaterialTheme.colorScheme.primary
                 ) {
                     Icon(Icons.Default.LibraryAdd, null, tint = Color.White)
                 }
@@ -209,13 +209,13 @@ fun NewProductTypeDialog(onDismiss: () -> Unit, onEquipment: () -> Unit, onSpare
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onEquipment() },
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = Primary80.copy(alpha = 0.1f))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.PrecisionManufacturing, null, tint = Primary80, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Default.PrecisionManufacturing, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                         Column {
-                            Text("Equipo", fontWeight = FontWeight.Bold, color = Primary80)
+                            Text("Equipo", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             Text("Nevera, aire, lavadora, etc.", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -224,13 +224,13 @@ fun NewProductTypeDialog(onDismiss: () -> Unit, onEquipment: () -> Unit, onSpare
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onSparePart() },
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = Secondary80.copy(alpha = 0.1f))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f))
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Default.Settings, null, tint = Secondary80, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(32.dp))
                         Column {
-                            Text("Repuesto", fontWeight = FontWeight.Bold, color = Secondary80)
+                            Text("Repuesto", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                             Text("Piezas, componentes, etc.", style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -274,10 +274,10 @@ fun SparePartSelectorDialog(
                                 .clickable { selected = sp },
                             shape = RoundedCornerShape(10.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) Primary80.copy(alpha = 0.2f)
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                                 else MaterialTheme.colorScheme.surfaceVariant
                             ),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, Primary80) else null
+                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
@@ -386,7 +386,7 @@ fun EquipmentCard(eq: Equipment, onEdit: (Equipment) -> Unit, onDelete: (Equipme
                         style = MaterialTheme.typography.labelSmall, color = statusColor, fontWeight = FontWeight.Medium)
                 }
             }
-            IconButton(onClick = { onEdit(eq) }) { Icon(Icons.Default.Edit, null, tint = Primary80) }
+            IconButton(onClick = { onEdit(eq) }) { Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary) }
             IconButton(onClick = { onDelete(eq) }) { Icon(Icons.Default.Delete, null, tint = StatusLowStock) }
         }
     }
@@ -434,8 +434,8 @@ fun SparePartCard(sp: SparePart, onEdit: (SparePart) -> Unit, onDelete: (SparePa
                         color = textColor, fontWeight = FontWeight.Medium)
                 }
             }
-            IconButton(onClick = { showMovement = true }) { Icon(Icons.Default.SwapVert, null, tint = Secondary80) }
-            if (onEdit != {}) IconButton(onClick = { onEdit(sp) }) { Icon(Icons.Default.Edit, null, tint = Primary80) }
+            IconButton(onClick = { showMovement = true }) { Icon(Icons.Default.SwapVert, null, tint = MaterialTheme.colorScheme.secondary) }
+            if (onEdit != {}) IconButton(onClick = { onEdit(sp) }) { Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary) }
             if (onDelete != {}) IconButton(onClick = { onDelete(sp) }) { Icon(Icons.Default.Delete, null, tint = StatusLowStock) }
         }
     }
@@ -585,7 +585,7 @@ fun StockMovementDialog(
                 Text(sp.name, style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Stock actual: ${sp.quantity} ${sp.unit}",
-                    style = MaterialTheme.typography.labelSmall, color = Primary80)
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         },
         text = {

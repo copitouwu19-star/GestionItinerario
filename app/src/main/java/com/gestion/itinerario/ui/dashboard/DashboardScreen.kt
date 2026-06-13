@@ -137,13 +137,13 @@ fun DashboardScreen(
                 Spacer(Modifier.height(6.dp))
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = Primary40.copy(alpha = 0.12f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 ) {
                     Text(displayCompanyName,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Primary40)
+                        color = MaterialTheme.colorScheme.primary)
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -158,19 +158,19 @@ fun DashboardScreen(
                             }
                         }) {
                             Icon(Icons.Default.Notifications, contentDescription = "Notificaciones",
-                                tint = Primary80, modifier = Modifier.size(26.dp))
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                         }
                     }
                 }
                 Box {
                     IconButton(onClick = { showUserMenu = true }) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "Menú usuario",
-                            tint = Primary80, modifier = Modifier.size(32.dp))
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                     }
                     DropdownMenu(expanded = showUserMenu, onDismissRequest = { showUserMenu = false }) {
                         DropdownMenuItem(
                             text = { Text("Perfil de empresa") },
-                            leadingIcon = { Icon(Icons.Default.Business, null, tint = Primary80) },
+                            leadingIcon = { Icon(Icons.Default.Business, null, tint = MaterialTheme.colorScheme.primary) },
                             onClick = { showUserMenu = false; onNavigate(com.gestion.itinerario.ui.Routes.PROFILE) }
                         )
                         HorizontalDivider()
@@ -206,7 +206,7 @@ fun DashboardScreen(
             onClick = { showMoreDetail = !showMoreDetail },
             modifier = Modifier.align(Alignment.End),
             shape = RoundedCornerShape(50),
-            color = Primary40.copy(alpha = 0.1f)
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -216,9 +216,9 @@ fun DashboardScreen(
                 Text(if (showMoreDetail) "Menos detalle" else "Más detalle",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = Primary40)
+                    color = MaterialTheme.colorScheme.primary)
                 Icon(if (showMoreDetail) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null, tint = Primary40, modifier = Modifier.size(20.dp))
+                    contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
         }
 
@@ -510,7 +510,8 @@ fun FeaturedServiceCard(modifier: Modifier, category: ServiceCategory, onClick: 
     Card(
         modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp, horizontal = 8.dp),
@@ -541,7 +542,8 @@ fun RecentActivityCard(activity: List<ActivityItem>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Actividad Reciente",
@@ -790,7 +792,8 @@ fun DailyChartsCard(stats: TodayStats, chartData: List<ChartDay>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Gráficos del Día",

@@ -33,8 +33,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.gestion.itinerario.data.entity.CompanyProfile
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,7 +187,7 @@ fun ProfileScreen(
                                 contentScale = ContentScale.Fit,
                                 loading = {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(32.dp), color = Primary80
+                                        modifier = Modifier.size(32.dp), color = MaterialTheme.colorScheme.primary
                                     )
                                 },
                                 error = {
@@ -222,7 +220,7 @@ fun ProfileScreen(
                             }
                         } else if (uploadState is UploadState.Loading) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(40.dp), color = Primary80
+                                modifier = Modifier.size(40.dp), color = MaterialTheme.colorScheme.primary
                             )
                         } else {
                             Column(
@@ -244,7 +242,7 @@ fun ProfileScreen(
                                 .align(Alignment.BottomEnd)
                                 .size(36.dp),
                             shape = CircleShape,
-                            color = Primary40,
+                            color = MaterialTheme.colorScheme.primary,
                             shadowElevation = 4.dp
                         ) {
                             Box(
@@ -268,7 +266,7 @@ fun ProfileScreen(
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
-                    color = if (uploadState is UploadState.Loading) Primary80
+                    color = if (uploadState is UploadState.Loading) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

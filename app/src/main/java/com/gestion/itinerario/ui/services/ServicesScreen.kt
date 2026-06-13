@@ -36,6 +36,23 @@ import com.gestion.itinerario.data.entity.FaultClassifier
 import java.text.SimpleDateFormat
 import java.util.*
 
+private sealed class HistItem {
+    abstract val ts: Long
+    abstract val uid: String
+    data class Cita(val a: Appointment) : HistItem() {
+        override val ts  = a.completedAt ?: a.dateTime
+        override val uid = "c_${a.id}"
+    }
+    data class Orden(val o: ServiceOrder) : HistItem() {
+        override val ts  = o.completedAt ?: o.createdAt
+        override val uid = "o_${o.id}"
+    }
+    data class Mant(val r: MaintenanceReminder) : HistItem() {
+        override val ts  = r.nextServiceDate
+        override val uid = "m_${r.id}"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServicesScreen(
@@ -74,6 +91,11 @@ fun ServicesScreen(
     var editAppointment by remember { mutableStateOf<Appointment?>(null) }
     var filterStatus by remember { mutableStateOf<ServiceStatus?>(null) }
     var showQuotes by remember { mutableStateOf(false) }
+
+    // Filtros del historial — solo activos en tab Finalizados
+    var searchQuery         by remember { mutableStateOf("") }
+    var filterServiceType   by remember { mutableStateOf<ServiceType?>(null) }
+    var filterEquipmentType by remember { mutableStateOf<String?>(null) }
 
     // Diálogo de "Programar próximo mantenimiento" al completar cita
     var completedAppointment by remember { mutableStateOf<Appointment?>(null) }
@@ -153,6 +175,44 @@ fun ServicesScreen(
     }
     val todayCount = filteredAppointments.count { it.dateTime >= todayStart && it.dateTime < todayStart + 86_400_000L }
 
+    fun dayLabel(ts: Long): String {
+        val itemMidnight = Calendar.getInstance().apply {
+            timeInMillis = ts
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val diff = ((todayStart - itemMidnight) / 86_400_000L).toInt()
+        return when {
+            diff <= 0 -> "Hoy"
+            diff == 1 -> "Ayer"
+            diff == 2 -> "Anteayer"
+            else -> SimpleDateFormat("EEEE d 'de' MMMM yyyy", Locale("es", "ES"))
+                .format(Date(ts)).replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    val completedGrouped: List<Pair<String, List<HistItem>>> =
+        if (filterStatus == ServiceStatus.COMPLETED) {
+            val q = searchQuery.trim().lowercase()
+            val items = mutableListOf<HistItem>()
+            allAppointments.filter { it.status == AppointmentStatus.COMPLETED }
+                .filter { q.isEmpty() || clientFullName(it.clientId).lowercase().contains(q) || it.equipmentType.lowercase().contains(q) }
+                .filter { filterEquipmentType == null || it.equipmentType.equals(filterEquipmentType, ignoreCase = true) }
+                .filter { filterServiceType == null || it.serviceType == filterServiceType }
+                .forEach { items += HistItem.Cita(it) }
+            orders.filter { it.status == ServiceStatus.COMPLETED && it.type != ServiceType.MAINTENANCE }
+                .filter { q.isEmpty() || clientFullName(it.clientId).lowercase().contains(q) || it.equipmentType.lowercase().contains(q) }
+                .filter { filterEquipmentType == null || it.equipmentType.equals(filterEquipmentType, ignoreCase = true) }
+                .filter { filterServiceType == null || it.type == filterServiceType }
+                .forEach { items += HistItem.Orden(it) }
+            reminders.filter { it.workStatus == "COMPLETED" }
+                .filter { q.isEmpty() || clientFullName(it.clientId).lowercase().contains(q) || it.equipmentType.lowercase().contains(q) }
+                .filter { filterEquipmentType == null || it.equipmentType.equals(filterEquipmentType, ignoreCase = true) }
+                .filter { filterServiceType == null || filterServiceType == ServiceType.MAINTENANCE }
+                .forEach { items += HistItem.Mant(it) }
+            items.sortedByDescending { it.ts }.groupBy { dayLabel(it.ts) }.toList()
+        } else emptyList()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -163,7 +223,7 @@ fun ServicesScreen(
                     }
                     IconButton(onClick = onNavigateToProfile) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "Perfil",
-                            tint = com.gestion.itinerario.ui.theme.Primary80,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = androidx.compose.ui.Modifier.size(28.dp))
                     }
                 }
@@ -172,7 +232,7 @@ fun ServicesScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { editAppointment = null; showAppointmentDialog = true },
-                containerColor = Primary40,
+                containerColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
             ) {
                 Icon(Icons.Default.Add, null, tint = Color.White)
@@ -194,9 +254,9 @@ fun ServicesScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ServiceFilterTab("Todos", selected = filterStatus == null) { filterStatus = null }
-                ServiceFilterTab("Pendiente", selected = filterStatus == ServiceStatus.PENDING) { filterStatus = ServiceStatus.PENDING }
-                ServiceFilterTab("En Proceso", selected = filterStatus == ServiceStatus.IN_PROGRESS) { filterStatus = ServiceStatus.IN_PROGRESS }
+                ServiceFilterTab("Todos", selected = filterStatus == null) { filterStatus = null; searchQuery = ""; filterServiceType = null; filterEquipmentType = null }
+                ServiceFilterTab("Pendiente", selected = filterStatus == ServiceStatus.PENDING) { filterStatus = ServiceStatus.PENDING; searchQuery = ""; filterServiceType = null; filterEquipmentType = null }
+                ServiceFilterTab("En Proceso", selected = filterStatus == ServiceStatus.IN_PROGRESS) { filterStatus = ServiceStatus.IN_PROGRESS; searchQuery = ""; filterServiceType = null; filterEquipmentType = null }
                 ServiceFilterTab("Finalizado", selected = filterStatus == ServiceStatus.COMPLETED) { filterStatus = ServiceStatus.COMPLETED }
             }
 
@@ -224,165 +284,280 @@ fun ServicesScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // ── Citas Programadas ─────────────────────────────────
-                    if (filteredAppointments.isNotEmpty()) {
+                    if (filterStatus == ServiceStatus.COMPLETED) {
+                        // ── Buscador ─────────────────────────────────────────────
                         item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Citas Programadas",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                if (todayCount > 0) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Primary40
-                                    ) {
-                                        Text(
-                                            "$todayCount Hoy",
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Buscar por cliente o equipo...") },
+                                leadingIcon = { Icon(Icons.Default.Search, null) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Default.Close, null)
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        // ── Chips de filtro ───────────────────────────────────────
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FilterChip(selected = filterServiceType == null,
+                                        onClick = { filterServiceType = null },
+                                        label = { Text("Todo tipo") })
+                                    FilterChip(selected = filterServiceType == ServiceType.REPAIR,
+                                        onClick = { filterServiceType = if (filterServiceType == ServiceType.REPAIR) null else ServiceType.REPAIR },
+                                        label = { Text("Reparación") })
+                                    FilterChip(selected = filterServiceType == ServiceType.INSTALLATION,
+                                        onClick = { filterServiceType = if (filterServiceType == ServiceType.INSTALLATION) null else ServiceType.INSTALLATION },
+                                        label = { Text("Instalación") })
+                                    FilterChip(selected = filterServiceType == ServiceType.MAINTENANCE,
+                                        onClick = { filterServiceType = if (filterServiceType == ServiceType.MAINTENANCE) null else ServiceType.MAINTENANCE },
+                                        label = { Text("Mantenimiento") })
+                                }
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    FilterChip(selected = filterEquipmentType == null,
+                                        onClick = { filterEquipmentType = null },
+                                        label = { Text("Todo equipo") })
+                                    EQUIPMENT_TYPES.forEach { et ->
+                                        FilterChip(selected = filterEquipmentType == et,
+                                            onClick = { filterEquipmentType = if (filterEquipmentType == et) null else et },
+                                            label = { Text(et) })
                                     }
                                 }
                             }
                         }
-                        items(filteredAppointments, key = { "appt_${it.id}" }) { appt ->
-                            val cn = clientFullName(appt.clientId).let {
-                                if (it == "Cliente" && appt.notes.isNotBlank())
-                                    appt.notes.substringBefore(" —").ifBlank { it } else it
-                            }
-                            ScheduledAppointmentCard(
-                                appointment   = appt,
-                                clientName    = cn,
-                                onViewDetails = { detailAppointment = appt },
-                                onEdit        = { editAppointment = appt; showAppointmentDialog = true },
-                                onStart       = { viewModel.startAppointment(appt) },
-                                onComplete    = {
-                                    viewModel.completeAppointment(appt)
-                                    invoiceAppointment = appt
-                                },
-                                onCancel      = {
-                                    confirmTitle   = "Cancelar cita"
-                                    confirmMessage = "¿Estás segura de que deseas cancelar esta cita?"
-                                    confirmAction  = { viewModel.cancelAppointment(appt) }
-                                }
-                            )
-                        }
-                    }
-
-                    // ── Órdenes de Servicio ───────────────────────────────
-                    if (filteredOrders.isNotEmpty()) {
-                        item {
-                            if (filteredAppointments.isNotEmpty()) Spacer(Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Órdenes de Servicio",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Secondary40.copy(alpha = 0.12f)
+                        // ── Historial agrupado por día ────────────────────────────
+                        if (completedGrouped.isEmpty()) {
+                            item {
+                                Box(
+                                    Modifier.fillParentMaxWidth().padding(top = 48.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        "${filteredOrders.size}",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Secondary40
-                                    )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.SearchOff, null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(48.dp))
+                                        Text("Sin resultados",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        } else {
+                            completedGrouped.forEach { (label, dayItems) ->
+                                item(key = "header_$label") {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary)
+                                        HorizontalDivider(Modifier.weight(1f),
+                                            color = MaterialTheme.colorScheme.outlineVariant)
+                                        Surface(shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
+                                            Text("${dayItems.size}",
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                }
+                                items(dayItems, key = { it.uid }) { histItem ->
+                                    when (histItem) {
+                                        is HistItem.Cita -> {
+                                            val appt = histItem.a
+                                            val cn = clientFullName(appt.clientId).let {
+                                                if (it == "Cliente" && appt.notes.isNotBlank())
+                                                    appt.notes.substringBefore(" —").ifBlank { it } else it
+                                            }
+                                            ScheduledAppointmentCard(
+                                                appointment   = appt,
+                                                clientName    = cn,
+                                                onViewDetails = { detailAppointment = appt },
+                                                onEdit        = { editAppointment = appt; showAppointmentDialog = true },
+                                                onStart       = { viewModel.startAppointment(appt) },
+                                                onComplete    = { viewModel.completeAppointment(appt); invoiceAppointment = appt },
+                                                onCancel      = {
+                                                    confirmTitle   = "Cancelar cita"
+                                                    confirmMessage = "¿Estás segura de que deseas cancelar esta cita?"
+                                                    confirmAction  = { viewModel.cancelAppointment(appt) }
+                                                }
+                                            )
+                                        }
+                                        is HistItem.Orden -> {
+                                            val order = histItem.o
+                                            ServiceOrderCard(order,
+                                                onEdit   = { editOrder = order; showDialog = true },
+                                                onDelete = {
+                                                    confirmTitle   = "Eliminar orden"
+                                                    confirmMessage = "¿Estás segura de que deseas eliminar esta orden? Esta acción no se puede deshacer."
+                                                    confirmAction  = { viewModel.delete(order) }
+                                                },
+                                                onStatusChange = { newStatus ->
+                                                    viewModel.updateStatus(order, newStatus)
+                                                    if (newStatus == ServiceStatus.COMPLETED) invoiceOrder = order
+                                                },
+                                                onInvoice = { invoiceOrder = order }
+                                            )
+                                        }
+                                        is HistItem.Mant -> {
+                                            val r = histItem.r
+                                            val cn2 = clientMap[r.clientId]?.let {
+                                                "${it.name}${if (it.lastName.isNotBlank()) " ${it.lastName}" else ""}"
+                                            } ?: "Sin cliente"
+                                            PreventiveMaintenanceCard(
+                                                reminder   = r,
+                                                clientName = cn2,
+                                                onClick    = { detailReminder = r },
+                                                onStart    = { viewModel.updateReminderStatus(r, "IN_PROGRESS") },
+                                                onComplete = { viewModel.updateReminderStatus(r, "COMPLETED"); invoiceReminder = r },
+                                                onEdit     = { editReminderDialog = r },
+                                                onCancel   = {
+                                                    confirmTitle   = "Cancelar mantenimiento"
+                                                    confirmMessage = "¿Estás segura de que deseas cancelar este mantenimiento preventivo? Se eliminará de la lista."
+                                                    confirmAction  = { viewModel.deleteReminder(r) }
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
-                        items(filteredOrders, key = { "order_${it.id}" }) { order ->
-                            ServiceOrderCard(order,
-                                onEdit   = { editOrder = order; showDialog = true },
-                                onDelete = {
-                                    confirmTitle   = "Eliminar orden"
-                                    confirmMessage = "¿Estás segura de que deseas eliminar esta orden? Esta acción no se puede deshacer."
-                                    confirmAction  = { viewModel.delete(order) }
-                                },
-                                onStatusChange = { newStatus ->
-                                    viewModel.updateStatus(order, newStatus)
-                                    if (newStatus == ServiceStatus.COMPLETED) invoiceOrder = order
-                                },
-                                onInvoice = { invoiceOrder = order }
-                            )
-                        }
-                    }
-
-                    // ── Mantenimientos preventivos ────────────────────────
-                    if (filteredMaintenanceReminders.isNotEmpty()) {
-                        item {
-                            Spacer(Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                    } else {
+                        // ── Citas Programadas ─────────────────────────────────
+                        if (filteredAppointments.isNotEmpty()) {
+                            item {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Default.Engineering,
-                                        contentDescription = null,
-                                        tint = Primary40,
-                                        modifier = Modifier.size(18.dp)
-                                    )
                                     Text(
-                                        "Mantenimientos preventivos",
+                                        "Citas Programadas",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
                                     )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Primary40.copy(alpha = 0.12f)
-                                ) {
-                                    Text(
-                                        "${filteredMaintenanceReminders.size}",
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Primary40
-                                    )
+                                    if (todayCount > 0) {
+                                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary) {
+                                            Text("$todayCount Hoy",
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold, color = Color.White)
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        items(filteredMaintenanceReminders, key = { "maint_${it.id}" }) { r ->
-                            val client = clientMap[r.clientId]
-                            val clientName = client?.let { "${it.name}${if (it.lastName.isNotBlank()) " ${it.lastName}" else ""}" } ?: "Sin cliente"
-                            PreventiveMaintenanceCard(
-                                reminder   = r,
-                                clientName = clientName,
-                                onClick    = { detailReminder = r },
-                                onStart    = { viewModel.updateReminderStatus(r, "IN_PROGRESS") },
-                                onComplete = {
-                                    viewModel.updateReminderStatus(r, "COMPLETED")
-                                    invoiceReminder = r
-                                },
-                                onEdit     = { editReminderDialog = r },
-                                onCancel   = {
-                                    confirmTitle   = "Cancelar mantenimiento"
-                                    confirmMessage = "¿Estás segura de que deseas cancelar este mantenimiento preventivo? Se eliminará de la lista."
-                                    confirmAction  = { viewModel.deleteReminder(r) }
+                            items(filteredAppointments, key = { "appt_${it.id}" }) { appt ->
+                                val cn = clientFullName(appt.clientId).let {
+                                    if (it == "Cliente" && appt.notes.isNotBlank())
+                                        appt.notes.substringBefore(" —").ifBlank { it } else it
                                 }
-                            )
+                                ScheduledAppointmentCard(
+                                    appointment   = appt, clientName = cn,
+                                    onViewDetails = { detailAppointment = appt },
+                                    onEdit        = { editAppointment = appt; showAppointmentDialog = true },
+                                    onStart       = { viewModel.startAppointment(appt) },
+                                    onComplete    = { viewModel.completeAppointment(appt); invoiceAppointment = appt },
+                                    onCancel      = {
+                                        confirmTitle   = "Cancelar cita"
+                                        confirmMessage = "¿Estás segura de que deseas cancelar esta cita?"
+                                        confirmAction  = { viewModel.cancelAppointment(appt) }
+                                    }
+                                )
+                            }
+                        }
+                        // ── Órdenes de Servicio ───────────────────────────────
+                        if (filteredOrders.isNotEmpty()) {
+                            item {
+                                if (filteredAppointments.isNotEmpty()) Spacer(Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Órdenes de Servicio",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f))
+                                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)) {
+                                        Text("${filteredOrders.size}",
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                                    }
+                                }
+                            }
+                            items(filteredOrders, key = { "order_${it.id}" }) { order ->
+                                ServiceOrderCard(order,
+                                    onEdit   = { editOrder = order; showDialog = true },
+                                    onDelete = {
+                                        confirmTitle   = "Eliminar orden"
+                                        confirmMessage = "¿Estás segura de que deseas eliminar esta orden? Esta acción no se puede deshacer."
+                                        confirmAction  = { viewModel.delete(order) }
+                                    },
+                                    onStatusChange = { newStatus ->
+                                        viewModel.updateStatus(order, newStatus)
+                                        if (newStatus == ServiceStatus.COMPLETED) invoiceOrder = order
+                                    },
+                                    onInvoice = { invoiceOrder = order }
+                                )
+                            }
+                        }
+                        // ── Mantenimientos preventivos ────────────────────────
+                        if (filteredMaintenanceReminders.isNotEmpty()) {
+                            item {
+                                Spacer(Modifier.height(4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Default.Engineering, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Text("Mantenimientos preventivos",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
+                                        Text("${filteredMaintenanceReminders.size}",
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                            items(filteredMaintenanceReminders, key = { "maint_${it.id}" }) { r ->
+                                val client = clientMap[r.clientId]
+                                val clientName = client?.let { "${it.name}${if (it.lastName.isNotBlank()) " ${it.lastName}" else ""}" } ?: "Sin cliente"
+                                PreventiveMaintenanceCard(
+                                    reminder = r, clientName = clientName,
+                                    onClick  = { detailReminder = r },
+                                    onStart  = { viewModel.updateReminderStatus(r, "IN_PROGRESS") },
+                                    onComplete = { viewModel.updateReminderStatus(r, "COMPLETED"); invoiceReminder = r },
+                                    onEdit   = { editReminderDialog = r },
+                                    onCancel = {
+                                        confirmTitle   = "Cancelar mantenimiento"
+                                        confirmMessage = "¿Estás segura de que deseas cancelar este mantenimiento preventivo? Se eliminará de la lista."
+                                        confirmAction  = { viewModel.deleteReminder(r) }
+                                    }
+                                )
+                            }
                         }
                     }
 
@@ -610,7 +785,7 @@ private fun NextMaintenanceDialog(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
         tonalElevation = 0.dp,
-        icon = { Icon(Icons.Default.NotificationsActive, null, tint = Primary80) },
+        icon = { Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary) },
         title = { Text("¿Programar próximo mantenimiento?", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -694,13 +869,13 @@ fun SectionHeader(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(vertical = 4.dp)
     ) {
-        Icon(icon, null, tint = Primary40, modifier = Modifier.size(18.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Text(title, fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onBackground)
-        Surface(shape = RoundedCornerShape(10.dp), color = Primary40.copy(alpha = 0.12f)) {
+        Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
             Text("$count", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall, color = Primary40,
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold)
         }
     }
@@ -730,7 +905,7 @@ private fun MaintenanceNextCycleDialog(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
         tonalElevation = 0.dp,
-        icon = { Icon(Icons.Default.NotificationsActive, null, tint = Primary80) },
+        icon = { Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary) },
         title = { Text("¿Programar próximo ciclo?", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -787,7 +962,7 @@ private fun PreventiveMaintenanceCard(
         else -> when {
             isDue || daysLeft <= 3 -> Color(0xFFD32F2F)
             daysLeft in 4..7       -> Color(0xFFFF8F00)
-            daysLeft in 8..30      -> Primary40
+            daysLeft in 8..30      -> MaterialTheme.colorScheme.primary
             else                   -> Color(0xFF00897B)
         }
     }
@@ -853,7 +1028,7 @@ private fun PreventiveMaintenanceCard(
                             if (reminder.workStatus != "COMPLETED") {
                                 IconButton(onClick = onEdit, modifier = Modifier.size(26.dp)) {
                                     Icon(Icons.Default.Edit, null,
-                                        tint = Primary40, modifier = Modifier.size(15.dp))
+                                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
                                 }
                             }
                             Surface(shape = RoundedCornerShape(6.dp), color = accentColor.copy(alpha = 0.13f)) {
@@ -870,12 +1045,12 @@ private fun PreventiveMaintenanceCard(
                                 )
                             }
                         }
-                        Surface(shape = RoundedCornerShape(6.dp), color = Primary40.copy(0.1f)) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary.copy(0.1f)) {
                             Text(
                                 "MANTENIMIENTO",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Primary40, fontWeight = FontWeight.Medium
+                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -932,7 +1107,7 @@ private fun PreventiveMaintenanceCard(
                                 .weight(1f)
                                 .height(38.dp)
                                 .clip(RoundedCornerShape(50))
-                                .background(Brush.linearGradient(listOf(Primary40, Secondary40)))
+                                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)))
                                 .clickable { actionClick() },
                             contentAlignment = Alignment.Center
                         ) {
@@ -976,7 +1151,7 @@ private fun ServiceFilterTab(label: String, selected: Boolean, onClick: () -> Un
             modifier = Modifier
                 .then(
                     if (selected) Modifier.background(
-                        Brush.linearGradient(listOf(Primary40, Secondary40)),
+                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                         RoundedCornerShape(50)
                     ) else Modifier
                 )
@@ -1031,7 +1206,7 @@ fun ScheduledAppointmentCard(
                     .width(5.dp)
                     .fillMaxHeight()
                     .background(
-                        Brush.verticalGradient(listOf(Primary40, Secondary40)),
+                        Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                         RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp)
                     )
             )
@@ -1064,7 +1239,7 @@ fun ScheduledAppointmentCard(
                                 modifier = Modifier.size(26.dp)
                             ) {
                                 Icon(Icons.Default.Edit, null,
-                                    tint = Primary40, modifier = Modifier.size(15.dp))
+                                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
                             }
                         }
                         Surface(
@@ -1166,7 +1341,7 @@ fun ScheduledAppointmentCard(
                                 .weight(1f)
                                 .height(38.dp)
                                 .clip(RoundedCornerShape(50))
-                                .background(Brush.linearGradient(listOf(Primary40, Secondary40)))
+                                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)))
                                 .clickable { actionClick() },
                             contentAlignment = Alignment.Center
                         ) {
@@ -1234,7 +1409,7 @@ fun ServiceOrderCard(
         colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Build, null, tint = Primary80, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Build, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(order.description, fontWeight = FontWeight.SemiBold,
@@ -1312,7 +1487,7 @@ fun ServiceOrderCard(
                         onClick = onInvoice,
                         modifier = Modifier.height(32.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary80)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(Icons.Default.Receipt, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
@@ -1322,7 +1497,7 @@ fun ServiceOrderCard(
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Edit, null, tint = Primary80, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Delete, null, tint = StatusLowStock, modifier = Modifier.size(18.dp))

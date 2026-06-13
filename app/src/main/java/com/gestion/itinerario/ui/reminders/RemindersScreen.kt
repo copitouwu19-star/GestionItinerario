@@ -124,7 +124,7 @@ fun RemindersScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showDialog = true },
-                containerColor = Primary40,
+                containerColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
             ) {
                 Icon(Icons.Default.Add, null, tint = Color.White)
@@ -135,7 +135,7 @@ fun RemindersScreen(
 
         LazyColumn(
             modifier = Modifier
-                .background(Color(0xFFF5F5F5))
+                .background(MaterialTheme.colorScheme.background)
                 .padding(top = padding.calculateTopPadding()),
             contentPadding = PaddingValues(
                 start = 16.dp, end = 16.dp,
@@ -184,7 +184,7 @@ fun RemindersScreen(
                                 Text(
                                     "Ver todos >",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Primary40
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -206,7 +206,7 @@ fun RemindersScreen(
                                 modifier = Modifier
                                     .width(4.dp)
                                     .fillMaxHeight()
-                                    .background(Primary40)
+                                    .background(MaterialTheme.colorScheme.primary)
                             )
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
@@ -219,12 +219,12 @@ fun RemindersScreen(
                                     thisMonthCount.toString().padStart(2, '0'),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = Primary40
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
                                     "Ver todos >",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Primary40
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -280,7 +280,7 @@ fun RemindersScreen(
                         Surface(
                             onClick = { filterToday = !filterToday },
                             shape = RoundedCornerShape(50),
-                            color = if (filterToday) Primary40 else Color.White,
+                            color = if (filterToday) MaterialTheme.colorScheme.primary else Color.White,
                             shadowElevation = if (filterToday) 0.dp else 2.dp
                         ) {
                             Text(
@@ -419,7 +419,7 @@ fun RemindersScreen(
             onDismissRequest = { completedReminder = null },
             containerColor = Color.White,
             tonalElevation = 0.dp,
-            icon = { Icon(Icons.Default.NotificationsActive, null, tint = Primary40) },
+            icon = { Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("¿Programar próximo ciclo?", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -442,7 +442,7 @@ fun RemindersScreen(
             },
             confirmButton = {
                 Button(onClick = { viewModel.markDone(r); completedReminder = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary40)) {
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
                     Text("Confirmar ciclo")
                 }
             },
@@ -491,7 +491,7 @@ fun ReminderCard(
     val accentColor = when {
         isDue || daysLeft <= 3          -> Color(0xFFD32F2F)
         daysLeft in 4..7                -> Color(0xFFFF8F00)
-        daysLeft in 8..30               -> Primary40
+        daysLeft in 8..30               -> MaterialTheme.colorScheme.primary
         else                             -> Color(0xFF00897B)
     }
 
@@ -602,7 +602,7 @@ fun ReminderCard(
                             ) {
                                 Icon(
                                     Icons.Default.Edit, null,
-                                    tint = Primary40,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -750,7 +750,7 @@ fun ReminderFormDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(
                         modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp))
-                            .background(Primary40),
+                            .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Engineering, null, tint = Color.White,
@@ -978,7 +978,7 @@ fun ReminderFormDialog(
                         Box(
                             modifier = Modifier.fillMaxWidth()
                                 .background(
-                                    Brush.linearGradient(listOf(Primary40, Secondary40)),
+                                    Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                                     RoundedCornerShape(50)
                                 )
                                 .padding(vertical = 12.dp),
@@ -1022,20 +1022,20 @@ fun ReminderDetailDialog(
                 // ID + tipo en la parte superior
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(shape = RoundedCornerShape(8.dp), color = Primary40.copy(0.12f)) {
+                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(0.12f)) {
                         Text(shortId,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold, color = Primary40)
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isAuto) Secondary40.copy(0.15f) else Tertiary40.copy(0.15f)
+                        color = if (isAuto) MaterialTheme.colorScheme.secondary.copy(0.15f) else MaterialTheme.colorScheme.tertiary.copy(0.15f)
                     ) {
                         Text(if (isAuto) "Auto" else "Manual",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (isAuto) Secondary40 else Tertiary40)
+                            color = if (isAuto) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary)
                     }
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = onDismiss) {
@@ -1049,7 +1049,7 @@ fun ReminderDetailDialog(
                 // Cliente
                 if (client != null) {
                     DetailRow(
-                        icon = { Icon(Icons.Default.Person, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                         label = "Cliente",
                         value = "${client.name}${if (client.lastName.isNotBlank()) " ${client.lastName}" else ""}"
                     )
@@ -1058,7 +1058,7 @@ fun ReminderDetailDialog(
                 // Equipo
                 if (r.equipmentType.isNotBlank()) {
                     DetailRow(
-                        icon = { Icon(Icons.Default.Build, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.Build, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                         label = "Equipo",
                         value = r.equipmentType
                     )
@@ -1067,7 +1067,7 @@ fun ReminderDetailDialog(
                 // Notas
                 if (r.notes.isNotBlank()) {
                     DetailRow(
-                        icon = { Icon(Icons.Default.Notes, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.Notes, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                         label = "Notas",
                         value = r.notes
                     )
@@ -1077,7 +1077,7 @@ fun ReminderDetailDialog(
                 if (isAuto) {
                     if (r.lastServiceDate > 0L) {
                         DetailRow(
-                            icon = { Icon(Icons.Default.History, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+                            icon = { Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                             label = "Último servicio",
                             value = sdf.format(Date(r.lastServiceDate))
                         )
@@ -1093,7 +1093,7 @@ fun ReminderDetailDialog(
                         else -> "Cada ${r.intervalValue} mes(es)"
                     }
                     DetailRow(
-                        icon = { Icon(Icons.Default.Repeat, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.Repeat, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                         label = "Intervalo",
                         value = intervalText
                     )
@@ -1109,7 +1109,7 @@ fun ReminderDetailDialog(
                         else -> "Repite cada ${r.intervalValue} mes(es)"
                     }
                     DetailRow(
-                        icon = { Icon(Icons.Default.Repeat, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(Icons.Default.Repeat, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) },
                         label = "Intervalo",
                         value = intervalText
                     )
@@ -1194,17 +1194,17 @@ private fun ReminderListDialog(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Engineering, null, tint = Primary40,
+                        Icon(Icons.Default.Engineering, null, tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(22.dp))
                         Text(title, style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
                         Surface(shape = RoundedCornerShape(50),
-                            color = Primary40.copy(alpha = 0.12f)) {
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)) {
                             Text(
                                 reminders.size.toString(),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold, color = Primary40
+                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -1234,7 +1234,7 @@ private fun ReminderListDialog(
                             val accentColor = when {
                                 isDue || daysLeft <= 3 -> Color(0xFFD32F2F)
                                 daysLeft in 4..7 -> Color(0xFFFF8F00)
-                                daysLeft in 8..30 -> Primary40
+                                daysLeft in 8..30 -> MaterialTheme.colorScheme.primary
                                 else -> Color(0xFF00897B)
                             }
                             val equipIcon = when (r.equipmentType.lowercase()) {
@@ -1355,7 +1355,7 @@ private fun ReminderIntervalPill(
                 .fillMaxWidth()
                 .then(
                     if (selected) Modifier.background(
-                        Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50)
+                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)), RoundedCornerShape(50)
                     ) else Modifier
                 )
                 .padding(vertical = 10.dp),

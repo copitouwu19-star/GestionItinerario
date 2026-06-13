@@ -44,12 +44,7 @@ import com.gestion.itinerario.data.entity.ServiceOrder
 import com.gestion.itinerario.data.entity.ServiceStatus
 import com.gestion.itinerario.data.entity.ServiceType
 import com.gestion.itinerario.ui.components.UserMenuIconButton
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
-import com.gestion.itinerario.ui.theme.Secondary40
-import com.gestion.itinerario.ui.theme.Secondary80
 import kotlinx.coroutines.launch
-import com.gestion.itinerario.ui.theme.Tertiary40
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import com.gestion.itinerario.ui.theme.StatusInRepair
 import com.gestion.itinerario.ui.theme.StatusLowStock
@@ -200,7 +195,7 @@ fun ClientsScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = innerPadding.calculateBottomPadding() + 16.dp),
-            containerColor = Primary40
+            containerColor = MaterialTheme.colorScheme.primary
         ) {
             Icon(Icons.Default.PersonAdd, null, tint = Color.White)
         }
@@ -239,7 +234,7 @@ fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -
                     .fillMaxHeight()
                     .background(
                         brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            if (isJuridica) listOf(Secondary40, Primary40) else listOf(Primary40, Secondary40)
+                            if (isJuridica) listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.primary) else listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                         ),
                         shape = RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp)
                     )
@@ -286,13 +281,13 @@ fun ClientCard(c: Client, onView: () -> Unit, onEdit: () -> Unit, onDelete: () -
                 // Chip tipo cliente
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = if (isJuridica) Secondary80.copy(alpha = 0.15f) else Primary80.copy(alpha = 0.12f)
+                    color = if (isJuridica) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 ) {
                     Text(
                         c.clientType,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isJuridica) Secondary40 else Primary40
+                        color = if (isJuridica) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
                     )
                 }
                 // Divisor sutil
@@ -383,7 +378,7 @@ fun ClientDetailScreen(
 
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 
-    val accentColors = listOf(Primary40, Secondary40, Tertiary40)
+    val accentColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.tertiary)
 
     Scaffold(
         topBar = {
@@ -485,7 +480,7 @@ fun ClientDetailScreen(
                                 .fillMaxHeight()
                                 .background(
                                     brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                        listOf(Primary40, Secondary40)
+                                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                                     ),
                                     shape = RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp)
                                 )
@@ -535,7 +530,7 @@ fun ClientDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     count = appointments.size,
                     label = "SERVICIOS",
-                    accentColor = Primary40
+                    accentColor = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -703,7 +698,7 @@ private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, me
 
 // ─── Tarjeta historial servicio ───────────────────────────────────────────────
 @Composable
-private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentColor: Color = Primary40) {
+private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentColor: Color = MaterialTheme.colorScheme.primary) {
     val (statusColor, statusLabel) = when (svc.status) {
         ServiceStatus.PENDING     -> StatusPending   to "PENDIENTE"
         ServiceStatus.IN_PROGRESS -> StatusInRepair  to "EN PROCESO"
@@ -801,7 +796,7 @@ private fun ServiceHistoryCard(svc: ServiceOrder, sdf: SimpleDateFormat, accentC
 private fun AppointmentHistoryCard(
     appt: Appointment,
     sdf: SimpleDateFormat,
-    accentColor: Color = Tertiary40,
+    accentColor: Color = MaterialTheme.colorScheme.tertiary,
     appointmentInvoices: List<Invoice> = emptyList(),
     onViewInvoices: () -> Unit = {}
 ) {
@@ -877,14 +872,14 @@ private fun AppointmentHistoryCard(
                         onClick = onViewInvoices,
                         modifier = Modifier.align(Alignment.End),
                         shape = RoundedCornerShape(50),
-                        border = BorderStroke(1.dp, Primary40)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Icons.Default.Receipt, null, modifier = Modifier.size(15.dp), tint = Primary40)
+                        Icon(Icons.Default.Receipt, null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(6.dp))
                         Text(
                             "Ver facturas (${appointmentInvoices.size})",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Primary40
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -898,7 +893,7 @@ private fun AppointmentHistoryCard(
 private fun InvoiceHistoryCard(
     inv: Invoice,
     sdf: SimpleDateFormat,
-    accentColor: Color = Primary40,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     isLoadingPdf: Boolean,
     onViewPdf: () -> Unit
 ) {
@@ -953,7 +948,7 @@ private fun InvoiceHistoryCard(
                         Spacer(Modifier.width(8.dp))
                         Text("Generando…", style = MaterialTheme.typography.labelSmall)
                     } else {
-                        Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(16.dp), tint = Primary80)
+                        Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
                         Text("Ver PDF", style = MaterialTheme.typography.labelSmall)
                     }
@@ -986,7 +981,7 @@ private fun AppointmentInvoicesDialog(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(
-                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Primary40),
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) { Icon(Icons.Default.Receipt, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
                     Column {
@@ -1014,7 +1009,7 @@ private fun AppointmentInvoicesDialog(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("\$${String.format("%.2f", inv.totalAmount)}",
                                     style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
-                                    color = Primary40, modifier = Modifier.weight(1f))
+                                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                                 Text(sdf.format(java.util.Date(inv.createdAt)),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1024,7 +1019,7 @@ private fun AppointmentInvoicesDialog(
                                     onClick = { onViewPdf(inv) }, enabled = !isLoadingPdf,
                                     modifier = Modifier.weight(1f), shape = RoundedCornerShape(50)
                                 ) {
-                                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(14.dp), tint = Primary80)
+                                    Icon(Icons.Default.PictureAsPdf, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                                     Spacer(Modifier.width(4.dp))
                                     Text("PDF", style = MaterialTheme.typography.labelSmall)
                                 }
@@ -1045,7 +1040,7 @@ private fun AppointmentInvoicesDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier.fillMaxWidth()
-                                            .background(Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50))
+                                            .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)), RoundedCornerShape(50))
                                             .padding(vertical = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) { Text("Editar", style = MaterialTheme.typography.labelSmall, color = Color.White) }
@@ -1084,7 +1079,7 @@ private fun InvoiceUpdateDialog(invoice: Invoice, onDismiss: () -> Unit, onSave:
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(
-                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Primary40),
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) { Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
                     Column {
@@ -1151,7 +1146,7 @@ private fun InvoiceUpdateDialog(invoice: Invoice, onDismiss: () -> Unit, onSave:
                     ) {
                         Box(
                             modifier = Modifier.fillMaxWidth()
-                                .background(Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50))
+                                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)), RoundedCornerShape(50))
                                 .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) { Text("Actualizar", color = Color.White, fontWeight = FontWeight.SemiBold) }
@@ -1167,7 +1162,7 @@ private fun InvoicePill(label: String, selected: Boolean, onClick: () -> Unit, m
     Surface(onClick = onClick, shape = RoundedCornerShape(50), color = if (selected) Color.Transparent else Color(0xFFF0F0F0), modifier = modifier) {
         Box(
             modifier = Modifier.fillMaxWidth()
-                .then(if (selected) Modifier.background(Brush.linearGradient(listOf(Primary40, Secondary40)), RoundedCornerShape(50)) else Modifier)
+                .then(if (selected) Modifier.background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)), RoundedCornerShape(50)) else Modifier)
                 .padding(vertical = 10.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -1179,7 +1174,7 @@ private fun InvoicePill(label: String, selected: Boolean, onClick: () -> Unit, m
 @Composable
 fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, null, tint = Primary80, modifier = Modifier.size(18.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }

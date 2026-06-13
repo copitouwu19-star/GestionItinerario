@@ -1,5 +1,6 @@
 package com.gestion.itinerario.ui.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -26,21 +27,32 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf("") }
 
     LaunchedEffect(uiState) {
         when (val s = uiState) {
             is AuthUiState.Success -> { viewModel.resetState(); onLoginSuccess() }
-            is AuthUiState.Error   -> if (s.message.contains("no está registrado", ignoreCase = true)) {
-                emailError = s.message
-                viewModel.resetState()
+            is AuthUiState.Error   -> {
+                val msg = s.message
+                when {
+                    msg.contains("no registrado", ignoreCase = true) -> {
+                        emailError = msg; viewModel.resetState()
+                    }
+                    msg.contains("Contraseña inválida", ignoreCase = true) ||
+                    msg.contains("incorrectos", ignoreCase = true) -> {
+                        passwordError = msg; viewModel.resetState()
+                    }
+                    else -> {}
+                }
             }
-            else                   -> {}
+            else -> {}
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -76,8 +88,10 @@ fun LoginScreen(
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = { password = it; passwordError = "" },
             label = { Text("Contraseña") },
+            isError = passwordError.isNotEmpty(),
+            supportingText = { if (passwordError.isNotEmpty()) Text(passwordError) },
             singleLine = true,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {

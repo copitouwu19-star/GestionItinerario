@@ -133,7 +133,7 @@ fun MaintenanceDetailScreen(
             onDismissRequest = { showCompleteDialog = false },
             containerColor = Color.White,
             tonalElevation = 0.dp,
-            icon = { Icon(Icons.Default.CameraAlt, null, tint = Primary40) },
+            icon = { Icon(Icons.Default.CameraAlt, null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("¿Añadir fotos antes de finalizar?", fontWeight = FontWeight.Bold) },
             text  = { Text("¿Deseas añadir fotos del resultado final del mantenimiento (\"Después\") antes de generar la factura?") },
             confirmButton = {
@@ -143,7 +143,7 @@ fun MaintenanceDetailScreen(
                         currentPhotoTarget = "after"
                         showPhotoSourceDialog = true
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary40)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) { Text("Añadir fotos") }
             },
             dismissButton = {
@@ -164,7 +164,7 @@ fun MaintenanceDetailScreen(
             text  = { Text(confirmMessage) },
             confirmButton = {
                 Button(onClick = { confirmAction?.invoke(); confirmAction = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary40)) { Text("Confirmar") }
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) { Text("Confirmar") }
             },
             dismissButton = { TextButton(onClick = { confirmAction = null }) { Text("Cancelar") } }
         )
@@ -213,7 +213,7 @@ fun MaintenanceDetailScreen(
                         Button(
                             onClick = { showPhotoSourceDialog = false; launchGallery(currentPhotoTarget) },
                             modifier = Modifier.weight(1f), shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(containerColor = Primary40)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp)); Text("Galería")
@@ -370,7 +370,7 @@ fun MaintenanceDetailScreen(
                                 Box(
                                     modifier = Modifier.fillMaxWidth().height(50.dp)
                                         .clip(RoundedCornerShape(50))
-                                        .background(Brush.linearGradient(listOf(Primary40, Secondary40)))
+                                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)))
                                         .clickable { reminderViewModel.update(live.copy(workStatus = "IN_PROGRESS")) },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -385,7 +385,7 @@ fun MaintenanceDetailScreen(
                                 Box(
                                     modifier = Modifier.fillMaxWidth().height(50.dp)
                                         .clip(RoundedCornerShape(50))
-                                        .background(Brush.linearGradient(listOf(Primary40, Secondary40)))
+                                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)))
                                         .clickable { showCompleteDialog = true },
                                     contentAlignment = Alignment.Center
                                 ) {

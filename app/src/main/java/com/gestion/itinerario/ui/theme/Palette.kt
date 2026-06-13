@@ -22,7 +22,8 @@ private fun mix(from: Color, to: Color, ratio: Float): Color = Color(
     alpha = 1f
 )
 
-/** Genera un esquema de colores claro a partir de tres tonos semilla, conservando las superficies neutras del tema. */
+/** Genera un esquema de colores claro a partir de tres tonos semilla. El fondo y las superficies
+ *  se tiñen sutilmente con el primary para que cada tema tenga una atmósfera propia. */
 private fun lightSchemeFrom(primary: Color, secondary: Color, tertiary: Color): ColorScheme = lightColorScheme(
     primary              = primary,
     onPrimary            = Color.White,
@@ -36,13 +37,14 @@ private fun lightSchemeFrom(primary: Color, secondary: Color, tertiary: Color): 
     onTertiary           = Color.White,
     tertiaryContainer    = mix(tertiary, Color.White, 0.82f),
     onTertiaryContainer  = tertiary,
-    background           = LightBackground,
+    // Fondo y variante de superficie adaptados al color primary (tinte muy sutil, 95 %/88 % blanco)
+    background           = mix(primary, Color.White, 0.96f),
     surface              = LightSurface,
-    surfaceVariant       = LightSurfaceVariant,
+    surfaceVariant       = mix(primary, Color.White, 0.88f),
     onBackground         = OnLightSurface,
     onSurface            = OnLightSurface,
     onSurfaceVariant     = OnLightSurfaceVariant,
-    outline              = LightOutline
+    outline              = mix(primary, Color.White, 0.72f)
 )
 
 /** Genera un esquema de colores oscuro a partir de tres tonos semilla, conservando las superficies neutras del tema. */

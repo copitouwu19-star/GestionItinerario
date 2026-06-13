@@ -17,7 +17,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gestion.itinerario.ui.auth.AuthUiState
 import com.gestion.itinerario.ui.auth.AuthViewModel
-import com.gestion.itinerario.ui.theme.Primary80
 
 @Composable
 fun UserMenuIconButton(
@@ -42,14 +41,14 @@ fun UserMenuIconButton(
             Icon(
                 Icons.Default.AccountCircle,
                 contentDescription = "Menú usuario",
-                tint = Primary80,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(28.dp)
             )
         }
         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
             DropdownMenuItem(
                 text = { Text("Perfil de empresa") },
-                leadingIcon = { Icon(Icons.Default.Business, null, tint = Primary80) },
+                leadingIcon = { Icon(Icons.Default.Business, null, tint = MaterialTheme.colorScheme.primary) },
                 onClick = { showMenu = false; onNavigateToProfile() }
             )
             HorizontalDivider()

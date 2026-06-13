@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.gestion.itinerario.ui.theme.Primary80
 import com.gestion.itinerario.ui.theme.StatusLowStock
 
 @Composable
@@ -61,7 +60,7 @@ fun PinScreen(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = Primary80, modifier = Modifier.size(40.dp))
+                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
             }
 
             Text(
@@ -80,7 +79,7 @@ fun PinScreen(
                 repeat(4) { i ->
                     val filled = i < pin.length
                     val dotColor by animateColorAsState(
-                        if (error) StatusLowStock else if (filled) Primary80 else Color.White.copy(alpha = 0.3f),
+                        if (error) StatusLowStock else if (filled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
                         label = "dot$i"
                     )
                     Box(

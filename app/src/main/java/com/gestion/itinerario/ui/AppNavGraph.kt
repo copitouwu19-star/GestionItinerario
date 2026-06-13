@@ -1,8 +1,11 @@
 package com.gestion.itinerario.ui
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -16,6 +19,22 @@ import com.gestion.itinerario.ui.dashboard.DashboardScreen
 import com.gestion.itinerario.ui.profile.ProfileScreen
 import com.gestion.itinerario.ui.reminders.RemindersScreen
 import com.gestion.itinerario.ui.services.ServicesScreen
+
+// Tema azul fijo para las pantallas de autenticación (no cambia con la paleta del usuario)
+private val AuthBlueScheme = lightColorScheme(
+    primary            = Color(0xFF1565C0),
+    onPrimary          = Color.White,
+    primaryContainer   = Color(0xFFD1E4FF),
+    onPrimaryContainer = Color(0xFF001D36),
+    secondary          = Color(0xFF0D47A1),
+    onSecondary        = Color.White,
+    background         = Color(0xFFF5F8FF),
+    surface            = Color.White,
+    onBackground       = Color(0xFF1A1C1E),
+    onSurface          = Color(0xFF1A1C1E),
+    onSurfaceVariant   = Color(0xFF44474F),
+    outline            = Color(0xFF74777F)
+)
 
 object Routes {
     const val LOGIN           = "login"
@@ -63,30 +82,36 @@ fun AppNavGraph(
 
     NavHost(navController = navController, startDestination = startDestination) {
 
-        // ── Auth ──────────────────────────────────────────────────────────────
+        // ── Auth (tema azul fijo, independiente de la paleta del usuario) ───────
         composable(Routes.LOGIN) {
-            LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(Routes.DASHBOARD) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
-                    }
-                },
-                onGoToRegister = { navController.navigate(Routes.REGISTER) },
-                onGoToForgotPassword = { navController.navigate(Routes.FORGOT_PASSWORD) }
-            )
+            MaterialTheme(colorScheme = AuthBlueScheme) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate(Routes.DASHBOARD) {
+                            popUpTo(Routes.LOGIN) { inclusive = true }
+                        }
+                    },
+                    onGoToRegister = { navController.navigate(Routes.REGISTER) },
+                    onGoToForgotPassword = { navController.navigate(Routes.FORGOT_PASSWORD) }
+                )
+            }
         }
         composable(Routes.REGISTER) {
-            RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Routes.DASHBOARD) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
-                    }
-                },
-                onGoToLogin = { navController.popBackStack() }
-            )
+            MaterialTheme(colorScheme = AuthBlueScheme) {
+                RegisterScreen(
+                    onRegisterSuccess = {
+                        navController.navigate(Routes.DASHBOARD) {
+                            popUpTo(Routes.LOGIN) { inclusive = true }
+                        }
+                    },
+                    onGoToLogin = { navController.popBackStack() }
+                )
+            }
         }
         composable(Routes.FORGOT_PASSWORD) {
-            ForgotPasswordScreen(onBack = { navController.popBackStack() })
+            MaterialTheme(colorScheme = AuthBlueScheme) {
+                ForgotPasswordScreen(onBack = { navController.popBackStack() })
+            }
         }
 
         // ── Main ──────────────────────────────────────────────────────────────

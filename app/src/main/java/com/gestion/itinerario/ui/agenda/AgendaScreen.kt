@@ -1,6 +1,5 @@
 package com.gestion.itinerario.ui.agenda
 
-import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
@@ -59,8 +58,6 @@ import kotlinx.coroutines.launch
 
 private val WhatsAppGreen = Color(0xFF25D366)
 
-private val ColorCita = Primary40
-private val ColorMantenimiento = Secondary40
 
 // Tipos de equipo disponibles
 val EQUIPMENT_TYPES = listOf("Nevera", "Aire Acondicionado", "Lavadora", "Otro")
@@ -178,7 +175,7 @@ fun AgendaScreen(
         },
     ) { scaffoldPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5)).padding(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(
                 top    = scaffoldPadding.calculateTopPadding(),
                 bottom = maxOf(innerPadding.calculateBottomPadding(), scaffoldPadding.calculateBottomPadding())
             ),
@@ -202,8 +199,8 @@ fun AgendaScreen(
             }
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendItem(color = ColorCita, label = "Cita / Reparación")
-                    LegendItem(color = ColorMantenimiento, label = "Mantenimiento")
+                    LegendItem(color = MaterialTheme.colorScheme.primary, label = "Cita / Reparación")
+                    LegendItem(color = MaterialTheme.colorScheme.secondary, label = "Mantenimiento")
                 }
             }
             item {
@@ -216,10 +213,10 @@ fun AgendaScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground)
-                    Surface(shape = RoundedCornerShape(20.dp), color = Primary80.copy(alpha = 0.15f)) {
+                    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)) {
                         Text("${selectedDayCitas.size} evento(s)",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall, color = Primary80)
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -348,10 +345,10 @@ fun CalendarCard(
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPreviousMonth) { Icon(Icons.Default.ChevronLeft, null, tint = Primary80) }
+                IconButton(onClick = onPreviousMonth) { Icon(Icons.Default.ChevronLeft, null, tint = MaterialTheme.colorScheme.primary) }
                 Text("${monthNames[currentMonth]} $currentYear", fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                IconButton(onClick = onNextMonth) { Icon(Icons.Default.ChevronRight, null, tint = Primary80) }
+                IconButton(onClick = onNextMonth) { Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.primary) }
             }
             Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -395,9 +392,9 @@ fun CalendarDayCell(
     hasMantenimiento: Boolean, hasCita: Boolean,
     modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
-    val gradient = Brush.linearGradient(listOf(Primary40, Secondary40))
+    val gradient = Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))
     Box(modifier = modifier.height(42.dp).padding(2.dp).clip(RoundedCornerShape(8.dp))
-        .then(if (isSelected && !isToday) Modifier.background(Primary80) else Modifier)
+        .then(if (isSelected && !isToday) Modifier.background(MaterialTheme.colorScheme.primary) else Modifier)
         .clickable { onClick() }, contentAlignment = Alignment.Center) {
         if (isToday) {
             Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(gradient))
@@ -409,9 +406,9 @@ fun CalendarDayCell(
             if (hasMantenimiento || hasCita) {
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (hasCita) Box(modifier = Modifier.size(5.dp).clip(CircleShape)
-                        .background(if (isSelected) Color.White else ColorCita))
+                        .background(if (isSelected) Color.White else MaterialTheme.colorScheme.primary))
                     if (hasMantenimiento) Box(modifier = Modifier.size(5.dp).clip(CircleShape)
-                        .background(if (isSelected) Color.White.copy(0.8f) else ColorMantenimiento))
+                        .background(if (isSelected) Color.White.copy(0.8f) else MaterialTheme.colorScheme.secondary))
                 }
             }
         }
@@ -441,7 +438,7 @@ fun AppointmentCard(
     val context = LocalContext.current
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     val isMantenimiento = a.serviceType == ServiceType.MAINTENANCE
-    val accentColor = if (isMantenimiento) ColorMantenimiento else ColorCita
+    val accentColor = if (isMantenimiento) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
     val idLabel = if (displayIndex >= 0) "CT-${(displayIndex + 1).toString().padStart(3, '0')}"
                   else "CT-${(a.id.hashCode().and(0x7FFFFFFF) % 1_000).toString().padStart(3, '0')}"
 
@@ -561,14 +558,14 @@ fun AppointmentCard(
                                 else "en ${diff / 86_400_000L}d"
                             }
                         }
-                        Surface(shape = RoundedCornerShape(8.dp), color = Primary40.copy(alpha = 0.10f)) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.Timer, null, modifier = Modifier.size(12.dp), tint = Primary40)
-                                Text(countdownText, style = MaterialTheme.typography.labelSmall, color = Primary40, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Default.Timer, null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
+                                Text(countdownText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -614,9 +611,9 @@ fun AppointmentCard(
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                 modifier = Modifier.height(32.dp)
                             ) {
-                                Icon(Icons.Default.Directions, null, modifier = Modifier.size(14.dp), tint = Primary40)
+                                Icon(Icons.Default.Directions, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(4.dp))
-                                Text("Navegar", style = MaterialTheme.typography.labelSmall, color = Primary40)
+                                Text("Navegar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                         Spacer(Modifier.weight(1f))
@@ -630,7 +627,7 @@ fun AppointmentCard(
                             }
                         }
                         IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.Edit, null, tint = Primary80, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -774,14 +771,8 @@ fun AppointmentFormDialog(
         dateStr = dateSdf.format(calendar.time)
     }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true)
 
-    val datePicker = DatePickerDialog(context, { _, y, m, d ->
-        calendar.set(y, m, d)
-        dateStr = String.format("%02d/%02d/%04d", d, m + 1, y)
-        timePicker.show()
-    }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).also {
-        // No permitir fechas anteriores a hoy al crear/editar una cita
-        it.datePicker.minDate = System.currentTimeMillis() - 1000L
-    }
+    var showDatePicker   by remember { mutableStateOf(false) }
+    var showPastDateError by remember { mutableStateOf(false) }
 
     // Diálogo de conflicto (overlay sobre el formulario)
     if (conflictAppointment != null && pendingSave != null) {
@@ -826,6 +817,15 @@ fun AppointmentFormDialog(
                             Button(
                                 onClick = {
                                     val client = selectedClient ?: return@Button
+                                    // Validar que la fecha no sea anterior a hoy
+                                    val todayMidnight = Calendar.getInstance().apply {
+                                        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                                        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                                    }.timeInMillis
+                                    if (calendar.timeInMillis < todayMidnight) {
+                                        showPastDateError = true
+                                        return@Button
+                                    }
                                     val clientDisplayName = "${client.name}${if (client.lastName.isNotBlank()) " ${client.lastName}" else ""}"
                                     val newAppointment = Appointment(
                                         clientId      = client.id,
@@ -986,7 +986,7 @@ fun AppointmentFormDialog(
                             color = MaterialTheme.colorScheme.primary,
                             letterSpacing = 1.sp)
                         Surface(
-                            modifier = Modifier.fillMaxWidth().clickable { datePicker.show() },
+                            modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
                             shape = RoundedCornerShape(16.dp),
                             color = Color.White,
                             shadowElevation = 2.dp
@@ -1172,6 +1172,69 @@ fun AppointmentFormDialog(
                     Spacer(Modifier.height(8.dp))
                 }
             }
+        }
+    }
+
+    // ── Error: fecha anterior a hoy ──
+    // Debe ir DESPUÉS del Dialog principal para que su ventana quede encima
+    if (showPastDateError) {
+        AlertDialog(
+            onDismissRequest = { showPastDateError = false },
+            icon = { Icon(Icons.Default.DateRange, null, tint = Color(0xFFFF8F00)) },
+            title = { Text("Fecha no válida", fontWeight = FontWeight.Bold) },
+            text = { Text("No puedes agendar citas en días anteriores al actual.\nPor favor selecciona una fecha de hoy en adelante.") },
+            confirmButton = {
+                Button(onClick = { showPastDateError = false }) { Text("Aceptar") }
+            }
+        )
+    }
+
+    // ── DatePicker Material3: desactiva y pone en gris días anteriores a hoy ──
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                set(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+                    calendar.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val local = Calendar.getInstance()
+                    val todayUtc = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                        set(local.get(Calendar.YEAR), local.get(Calendar.MONTH),
+                            local.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    return utcTimeMillis >= todayUtc.timeInMillis
+                }
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        val utcCal = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+                            .apply { timeInMillis = millis }
+                        calendar.set(
+                            utcCal.get(Calendar.YEAR),
+                            utcCal.get(Calendar.MONTH),
+                            utcCal.get(Calendar.DAY_OF_MONTH)
+                        )
+                        dateStr = String.format("%02d/%02d/%04d",
+                            utcCal.get(Calendar.DAY_OF_MONTH),
+                            utcCal.get(Calendar.MONTH) + 1,
+                            utcCal.get(Calendar.YEAR))
+                        showDatePicker = false
+                        timePicker.show()
+                    }
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+            }
+        ) {
+            DatePicker(state = pickerState)
         }
     }
 }

@@ -32,9 +32,6 @@ import kotlinx.coroutines.launch
 import com.gestion.itinerario.R
 import com.gestion.itinerario.data.entity.*
 import com.gestion.itinerario.ui.profile.ProfileViewModel
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
-import com.gestion.itinerario.ui.theme.Secondary40
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import java.text.SimpleDateFormat
 import java.util.*
@@ -465,7 +462,7 @@ private fun PaymentPill(
                 .fillMaxWidth()
                 .then(
                     if (selected) Modifier.background(
-                        Brush.linearGradient(listOf(Primary40, Secondary40)),
+                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
                         RoundedCornerShape(50)
                     ) else Modifier
                 )
@@ -538,7 +535,7 @@ private fun InvoiceCreatedView(
             Icon(Icons.Default.CheckCircle, null, tint = StatusCompleted, modifier = Modifier.size(40.dp))
         }
         Text("¡Factura Generada!", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(invoiceNumber, style = MaterialTheme.typography.titleMedium, color = Primary80)
+        Text(invoiceNumber, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 
         if (profile.logoUrl.isNotBlank()) {
             val logoData: Any = remember(profile.logoUrl) {
@@ -558,7 +555,7 @@ private fun InvoiceCreatedView(
         HorizontalDivider()
 
         if (invoice == null) {
-            CircularProgressIndicator(color = Primary40)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             Text("Cargando factura…", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {

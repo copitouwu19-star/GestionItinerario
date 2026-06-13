@@ -27,8 +27,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gestion.itinerario.data.entity.Client
 import com.gestion.itinerario.data.entity.QuoteItem
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
 
 private data class DraftItem(
     var description: String = "",
@@ -72,7 +70,7 @@ fun QuoteFormDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center) {
                     Box(modifier = Modifier.size(72.dp).clip(RoundedCornerShape(24.dp))
-                        .background(Primary40), contentAlignment = Alignment.Center) {
+                        .background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.CheckCircle, null, tint = Color.White,
                             modifier = Modifier.size(40.dp))
                     }

@@ -19,8 +19,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gestion.itinerario.R
-import com.gestion.itinerario.ui.theme.Primary40
-import com.gestion.itinerario.ui.theme.Primary80
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -99,7 +97,7 @@ fun MonthlyReportDialog(
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Summarize, null, tint = Primary80, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Summarize, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     Text("Reporte mensual", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
                 Text("Selecciona el mes a reportar. Incluirá ingresos facturados, cobros y servicios completados.",
