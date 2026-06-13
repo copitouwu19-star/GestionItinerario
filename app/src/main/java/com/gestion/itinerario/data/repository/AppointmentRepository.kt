@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -59,12 +60,17 @@ class AppointmentRepository @Inject constructor(private val db: FirebaseFirestor
 
     suspend fun save(app: Appointment): String {
         val ref = if (app.id.isEmpty()) col.document() else col.document(app.id)
-        ref.set(app.toMap()).await()
+        // Timeout igual que Invoice/Quote: Firestore escribe en caché local aunque el await no retorne
+        try { withTimeout(5_000L) { ref.set(app.toMap()).await() } } catch (_: Exception) {}
         return ref.id
     }
 
-    suspend fun update(app: Appointment) { col.document(app.id).set(app.toMap()).await() }
-    suspend fun delete(app: Appointment) { col.document(app.id).delete().await() }
+    suspend fun update(app: Appointment) {
+        try { withTimeout(5_000L) { col.document(app.id).set(app.toMap()).await() } } catch (_: Exception) {}
+    }
+    suspend fun delete(app: Appointment) {
+        try { withTimeout(5_000L) { col.document(app.id).delete().await() } } catch (_: Exception) {}
+    }
 
     private fun todayRange(): Pair<Long, Long> {
         val cal = Calendar.getInstance()
@@ -88,7 +94,9 @@ private fun Appointment.toMap(): Map<String, Any?> = mapOf(
     "createdAt" to createdAt,
     "photosBefore" to photosBefore,
     "photosDuring" to photosDuring,
-    "photosAfter" to photosAfter
+    "photosAfter" to photosAfter,
+    "completedAt" to completedAt,
+    "attendanceStatus" to attendanceStatus
 )
 
 @Suppress("UNCHECKED_CAST")
@@ -107,7 +115,9 @@ private fun com.google.firebase.firestore.DocumentSnapshot.toAppointment(): Appo
             createdAt = getLong("createdAt") ?: System.currentTimeMillis(),
             photosBefore = (get("photosBefore") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
             photosDuring = (get("photosDuring") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            photosAfter  = (get("photosAfter")  as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            photosAfter  = (get("photosAfter")  as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            completedAt      = getLong("completedAt"),
+            attendanceStatus = getString("attendanceStatus") ?: ""
         )
     } catch (e: Exception) { null }
 }

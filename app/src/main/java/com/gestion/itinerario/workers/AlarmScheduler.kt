@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.gestion.itinerario.data.entity.Appointment
+import com.gestion.itinerario.data.entity.MaintenanceReminder
 import com.gestion.itinerario.data.entity.ServiceType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.text.SimpleDateFormat
@@ -44,25 +45,79 @@ class AlarmScheduler @Inject constructor(
         // Alarma 1 — 24 horas antes
         scheduleAlarm(am, rc + 2, a.dateTime - MS_24H,
             "Cita mañana — $tipo",
-            "$tipo con $clientName mañana a las $hora")
+            "$tipo con $clientName mañana a las $hora",
+            a.id, "appointment")
 
         // Alarma 2 — 5 horas antes
         scheduleAlarm(am, rc + 1, a.dateTime - MS_5H,
             "Cita en 5 horas — $tipo",
-            "$tipo con $clientName hoy a las $hora")
+            "$tipo con $clientName hoy a las $hora",
+            a.id, "appointment")
 
         // Alarma 3 — exactamente a la hora de la cita
         scheduleAlarm(am, rc, a.dateTime,
             "¡Ahora! $tipo",
-            "$tipo con $clientName a las $hora")
+            "$tipo con $clientName a las $hora",
+            a.id, "appointment")
+
+        // Alarma 4 — 5 horas después (seguimiento: ¿atendiste la cita?)
+        scheduleAlarm(am, rc + 3, a.dateTime + MS_5H,
+            "¿Atendiste la cita?",
+            "Han pasado 5 horas. ¿Ya atendiste el $tipo con $clientName?",
+            a.id, "appointment")
 
         return true
+    }
+
+    // ── Mantenimientos preventivos ───────────────────────────────────────────
+
+    fun scheduleReminder(r: MaintenanceReminder, clientName: String): Boolean {
+        val now = System.currentTimeMillis()
+        if (r.nextServiceDate <= now) return true
+
+        val am  = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val hora  = SimpleDateFormat("HH:mm",       Locale.getDefault()).format(Date(r.nextServiceDate))
+        val fecha = SimpleDateFormat("dd/MM",       Locale.getDefault()).format(Date(r.nextServiceDate))
+        val equipo = r.equipmentType.ifBlank { "Mantenimiento" }
+
+        // Base distinta a las citas para evitar colisión de requestCodes
+        val rc = (r.id.hashCode() and 0x3FFFFFFF) or 0x40000000
+
+        scheduleAlarm(am, rc + 2, r.nextServiceDate - MS_24H,
+            "Mantenimiento mañana — $equipo",
+            "$equipo de $clientName mañana a las $hora",
+            r.id, "reminder")
+
+        scheduleAlarm(am, rc + 1, r.nextServiceDate - MS_5H,
+            "Mantenimiento en 5 h — $equipo",
+            "$equipo de $clientName hoy a las $hora",
+            r.id, "reminder")
+
+        scheduleAlarm(am, rc, r.nextServiceDate,
+            "¡Hoy! Mantenimiento $equipo",
+            "$equipo — $clientName · $fecha $hora",
+            r.id, "reminder")
+
+        return true
+    }
+
+    fun cancelReminder(reminderId: String) {
+        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val rc = (reminderId.hashCode() and 0x3FFFFFFF) or 0x40000000
+        listOf(rc, rc + 1, rc + 2).forEach { code ->
+            val intent = Intent(context, ReminderAlarmReceiver::class.java)
+            val pi = PendingIntent.getBroadcast(
+                context, code, intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            pi?.let { am.cancel(it) }
+        }
     }
 
     fun cancel(appointmentId: String) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val rc = appointmentId.hashCode() and 0x3FFFFFFF
-        listOf(rc, rc + 1, rc + 2).forEach { code ->
+        listOf(rc, rc + 1, rc + 2, rc + 3).forEach { code ->
             val intent = Intent(context, ReminderAlarmReceiver::class.java)
             val pi = PendingIntent.getBroadcast(
                 context, code, intent,
@@ -77,19 +132,26 @@ class AlarmScheduler @Inject constructor(
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
     }
 
-    private fun scheduleAlarm(am: AlarmManager, requestCode: Int, triggerAt: Long, title: String, message: String) {
+    private fun scheduleAlarm(
+        am: AlarmManager, requestCode: Int, triggerAt: Long,
+        title: String, message: String,
+        entityId: String = "", entityType: String = ""
+    ) {
         if (triggerAt <= System.currentTimeMillis()) return
         val intent = Intent(context, ReminderAlarmReceiver::class.java).apply {
             putExtra(ReminderAlarmReceiver.EXTRA_TITLE, title)
             putExtra(ReminderAlarmReceiver.EXTRA_MESSAGE, message)
             putExtra(ReminderAlarmReceiver.EXTRA_NOTIF_ID, requestCode)
+            putExtra(ReminderAlarmReceiver.EXTRA_ENTITY_ID, entityId)
+            putExtra(ReminderAlarmReceiver.EXTRA_ENTITY_TYPE, entityType)
         }
         val pi = PendingIntent.getBroadcast(
             context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        // setAlarmClock: exento de Doze mode, no requiere SCHEDULE_EXACT_ALARM,
-        // es el método más confiable para recordatorios exactos
-        am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, null), pi)
+        // setAlarmClock: exento de Doze mode, es el método más confiable para recordatorios exactos
+        try {
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, null), pi)
+        } catch (_: SecurityException) { /* permiso no otorgado en este dispositivo */ }
     }
 }

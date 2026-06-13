@@ -136,9 +136,15 @@ class ServiceViewModel @Inject constructor(
         appointmentRepo.update(a.copy(status = AppointmentStatus.IN_PROGRESS))
     }
 
-    /** IN_PROGRESS → COMPLETED */
+    /** IN_PROGRESS → COMPLETED; registra completedAt y detecta retraso */
     fun completeAppointment(a: Appointment) = viewModelScope.launch {
-        appointmentRepo.update(a.copy(status = AppointmentStatus.COMPLETED))
+        val now = System.currentTimeMillis()
+        val lateStatus = if (now > a.dateTime) "ATENDIDO_CON_RETRASO" else ""
+        appointmentRepo.update(a.copy(
+            status = AppointmentStatus.COMPLETED,
+            completedAt = now,
+            attendanceStatus = lateStatus
+        ))
     }
 
     fun cancelAppointment(a: Appointment) = viewModelScope.launch {

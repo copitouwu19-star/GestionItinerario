@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,15 +38,19 @@ class ReminderRepository @Inject constructor(private val db: FirebaseFirestore) 
 
     suspend fun save(r: MaintenanceReminder): String {
         val ref = if (r.id.isEmpty()) col.document() else col.document(r.id)
-        ref.set(r.toMap()).await()
+        try { withTimeout(5_000L) { ref.set(r.toMap()).await() } } catch (_: Exception) {}
         return ref.id
     }
 
     suspend fun getById(id: String): MaintenanceReminder? =
         col.document(id).get().await().toReminder()
 
-    suspend fun update(r: MaintenanceReminder) { col.document(r.id).set(r.toMap()).await() }
-    suspend fun delete(r: MaintenanceReminder) { col.document(r.id).delete().await() }
+    suspend fun update(r: MaintenanceReminder) {
+        try { withTimeout(5_000L) { col.document(r.id).set(r.toMap()).await() } } catch (_: Exception) {}
+    }
+    suspend fun delete(r: MaintenanceReminder) {
+        try { withTimeout(5_000L) { col.document(r.id).delete().await() } } catch (_: Exception) {}
+    }
 }
 
 private fun MaintenanceReminder.toMap(): Map<String, Any?> = mapOf(

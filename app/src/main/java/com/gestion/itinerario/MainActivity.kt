@@ -40,6 +40,8 @@ import com.gestion.itinerario.ui.theme.ThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 data class NavItem(val route: String, val label: String, val icon: ImageVector)
 
@@ -57,9 +59,28 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
+    // ID y tipo de entidad enviados desde una notificación (para navegación profunda)
+    private val _pendingEntityId   = MutableStateFlow<String?>(null)
+    private val _pendingEntityType = MutableStateFlow<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        applyNotificationIntent(intent)
+    }
+
+    private fun applyNotificationIntent(i: Intent?) {
+        val id   = i?.getStringExtra("entity_id")   ?: return
+        val type = i.getStringExtra("entity_type")  ?: return
+        if (id.isNotBlank() && type.isNotBlank()) {
+            _pendingEntityId.value   = id
+            _pendingEntityType.value = type
+        }
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyNotificationIntent(intent)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
@@ -89,6 +110,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeViewModel: ThemeViewModel = hiltViewModel()
             val paletteId by themeViewModel.paletteId.collectAsStateWithLifecycle()
+            val pendingEntityId   by _pendingEntityId.asStateFlow().collectAsState()
+            val pendingEntityType by _pendingEntityType.asStateFlow().collectAsState()
             GestionItinerarioTheme(paletteId = paletteId) {
                 var isLoggedIn by remember {
                     mutableStateOf(FirebaseAuth.getInstance().currentUser != null)
@@ -122,11 +145,17 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
                     AppNavGraph(
-                        navController  = navController,
-                        innerPadding   = innerPadding,
-                        isLoggedIn     = isLoggedIn,
-                        onLogout       = { isLoggedIn = false },
-                        onNavigate     = { route ->
+                        navController       = navController,
+                        innerPadding        = innerPadding,
+                        isLoggedIn          = isLoggedIn,
+                        onLogout            = { isLoggedIn = false },
+                        pendingEntityId     = pendingEntityId,
+                        pendingEntityType   = pendingEntityType,
+                        onNavigationHandled = {
+                            _pendingEntityId.value   = null
+                            _pendingEntityType.value = null
+                        },
+                        onNavigate          = { route ->
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true

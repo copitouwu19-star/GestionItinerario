@@ -61,7 +61,9 @@ fun RemindersScreen(
     onNavigateToProfile: () -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: ReminderViewModel = hiltViewModel(),
-    profileViewModel: ProfileViewModel = hiltViewModel()
+    profileViewModel: ProfileViewModel = hiltViewModel(),
+    openReminderId: String? = null,
+    onOpenHandled: () -> Unit = {}
 ) {
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val clients   by viewModel.clients.collectAsStateWithLifecycle()
@@ -70,6 +72,17 @@ fun RemindersScreen(
     var showDialog          by remember { mutableStateOf(false) }
     var editReminder        by remember { mutableStateOf<MaintenanceReminder?>(null) }
     var detailReminder      by remember { mutableStateOf<MaintenanceReminder?>(null) }
+
+    // Abrir detalle directamente cuando se llega desde una notificación
+    LaunchedEffect(openReminderId, reminders) {
+        if (openReminderId != null && reminders.isNotEmpty()) {
+            val r = reminders.find { it.id == openReminderId }
+            if (r != null) {
+                detailReminder = r
+                onOpenHandled()
+            }
+        }
+    }
     var invoiceReminder     by remember { mutableStateOf<MaintenanceReminder?>(null) }
     var completedReminder   by remember { mutableStateOf<MaintenanceReminder?>(null) }
     var showPendingDetail   by remember { mutableStateOf(false) }

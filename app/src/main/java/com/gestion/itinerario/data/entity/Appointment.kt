@@ -2,6 +2,7 @@ package com.gestion.itinerario.data.entity
 
 enum class AppointmentStatus { SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED }
 
+// attendanceStatus: "" normal, "SIN_ATENDER" después de 24h sin respuesta, "ATENDIDO_CON_RETRASO" completado tarde
 data class Appointment(
     val id: String = "",
     val clientId: String = "",
@@ -14,5 +15,7 @@ data class Appointment(
     val createdAt: Long = System.currentTimeMillis(),
     val photosBefore: List<String> = emptyList(),
     val photosDuring: List<String> = emptyList(),
-    val photosAfter: List<String> = emptyList()
+    val photosAfter: List<String> = emptyList(),
+    val completedAt: Long? = null,
+    val attendanceStatus: String = ""
 )

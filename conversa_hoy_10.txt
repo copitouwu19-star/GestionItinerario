@@ -1,0 +1,3076 @@
+ ▐▛███▜▌   Claude Code v2.1.169
+▝▜█████▛▘  Sonnet 4.6 · Claude Pro
+  ▘▘ ▝▝    ~\Downloads\app_gestion_itinerario
+
+  Searched for 1 pattern (ctrl+o to expand)
+  ⎿  Read ..\..\.claude\projects\C--Users-sofia-Downloads-app-gestion-itinerario\memory\project_latest_changes.md (50 lines)
+  ⎿  Read app\src\main\java\com\gestion\itinerario\ui\reminders\RemindersScreen.kt (340 lines)
+  ⎿  Read ..\..\AppData\Local\Temp\claude\C--Users-sofia-Downloads-app-gestion-itinerario\5e0e96bc-db03-4fdf-be18-edb9edc1039e\tasks\b9uskaoj2.output (36 lines)
+  ⎿  Referenced file app\src\main\java\com\gestion\itinerario\ui\services\ServicesScreen.kt
+  ⎿  Read app\src\main\java\com\gestion\itinerario\ui\AppNavGraph.kt (93 lines)
+
+● Let me read the critical files in parallel before making changes.
+
+  Read 3 files (ctrl+o to expand)
+
+● Now let me read the AppointmentHistoryCard and InvoiceHistoryCard
+  implementations.
+
+  Read 2 files (ctrl+o to expand)
+
+● Let me check the ServicesScreen state variables to understand what's already
+  there.
+
+  Searched for 1 pattern, read 4 files (ctrl+o to expand)
+
+● Now I have everything I need. Let me implement all 4 changes in parallel.
+
+● Update(app\src\main\java\com\gestion\itinerario\data\repository\ProfileReposit
+        ory.kt)
+  ⎿  Added 5 lines, removed 1 line
+      88  
+      89      suspend fun incrementCounter(): Int {
+      90          return kotlinx.coroutines.withTimeout(12_000L) {
+      91 -            val snap = doc.get().await()                       
+      91 +            val snap = try {                                   
+      92 +                doc.get(com.google.firebase.firestore.Source.CA
+         +CHE).await()                                                   
+      93 +            } catch (_: Exception) {                           
+      94 +                doc.get().await()                              
+      95 +            }                                                  
+      96              val current = snap.getLong("invoiceCounter")?.toInt
+          () ?: 0
+      97              val next = current + 1
+      98              // set+merge crea el doc si no existe; update() fal
+          laba cuando no existía
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\services\ServicesScreen.kt)
+  ⎿  Added 1 line, removed 1 line
+      138          },
+      139          floatingActionButton = {
+      140              FloatingActionButton(
+      141 -                onClick = { editOrder = null; showDialog = tru
+          -e },                                                          
+      141 +                onClick = { editAppointment = null; showAppoin
+          +tmentDialog = true },                                         
+      142                  containerColor = Primary40,
+      143                  modifier = Modifier.padding(bottom = innerPadd
+           ing.calculateBottomPadding())
+      144              ) {
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\InvoiceViewModel.kt
+        )
+  ⎿  Added 11 lines
+      122          }
+      123      }
+      124  
+      125 +    fun updateInvoice(invoice: Invoice, onDone: () -> Unit = {
+          +}, onError: (Throwable) -> Unit = {}) = viewModelScope.launch 
+          +{                                                             
+      126 +        try {                                                 
+      127 +            invoiceRepo.save(invoice)                         
+      128 +            _lastCreatedInvoice.value = invoice               
+      129 +            onDone()                                          
+      130 +        } catch (e: Exception) {                              
+      131 +            e.printStackTrace()                               
+      132 +            onError(e)                                        
+      133 +        }                                                     
+      134 +    }                                                         
+      135 +                                                              
+      136      fun getInvoicesByClient(clientId: String) = invoiceRepo.ge
+           tByClient(clientId)
+      137  
+      138      fun clearSavedId() { _savedInvoiceId.value = null }
+
+● Now the complex changes to ClientsScreen.kt — imports, state vars, modified
+  card call, dialog invocations, and new composables.
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 3 lines
+      21  import androidx.compose.ui.Alignment
+      22  import androidx.compose.ui.Modifier
+      23  import androidx.compose.ui.draw.clip
+      24 +import androidx.compose.ui.graphics.Brush                      
+      25  import androidx.compose.ui.graphics.Color
+      26  import androidx.compose.ui.platform.LocalContext
+      27 +import androidx.compose.ui.window.Dialog                       
+      28 +import androidx.compose.ui.window.DialogProperties             
+      29  import androidx.compose.ui.res.painterResource
+      30  import androidx.compose.ui.text.font.FontWeight
+      31  import androidx.compose.ui.text.input.KeyboardType
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 3 lines
+      37  import com.gestion.itinerario.data.entity.AppointmentStatus
+      38  import com.gestion.itinerario.data.entity.Client
+      39  import com.gestion.itinerario.data.entity.Invoice
+      40 +import com.gestion.itinerario.data.entity.InvoiceItem          
+      41 +import com.gestion.itinerario.data.entity.PaymentMethod        
+      42 +import com.gestion.itinerario.data.entity.PaymentStatus        
+      43  import com.gestion.itinerario.data.entity.ServiceOrder
+      44  import com.gestion.itinerario.data.entity.ServiceStatus
+      45  import com.gestion.itinerario.data.entity.ServiceType
+
+● Now add the two state variables in ClientDetailScreen:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 4 lines, removed 2 lines
+      375      val invoices       by viewModel.getInvoicesForClient(clien
+           t).collectAsState(initial = emptyList())
+      376      val companyProfile by profileViewModel.profile.collectAsSt
+           ateWithLifecycle()
+      377      val pdfScope = rememberCoroutineScope()
+      378 -    var generatingInvoiceId by remember { mutableStateOf<Strin
+          -g?>(null) }                                                   
+      379 -    var showMoreMenu        by remember { mutableStateOf(false
+          -) }                                                           
+      378 +    var generatingInvoiceId  by remember { mutableStateOf<Stri
+          +ng?>(null) }                                                  
+      379 +    var showInvoicesForAppt  by remember { mutableStateOf<Stri
+          +ng?>(null) }                                                  
+      380 +    var editingInvoice       by remember { mutableStateOf<Invo
+          +ice?>(null) }                                                 
+      381 +    var showMoreMenu         by remember { mutableStateOf(fals
+          +e) }                                                          
+      382  
+      383      val sdf = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", 
+           Locale.getDefault()) }
+      384  
+
+● Now update the AppointmentHistoryCard call to pass invoice data:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 8 lines, removed 1 line
+      548                  item { EmptyState(icon = Icons.Default.Calenda
+           rToday, message = "Sin servicios registrados") }
+      549              } else {
+      550                  itemsIndexed(appointments, key = { _, a -> a.i
+           d }) { index, appt ->
+      551 -                    AppointmentHistoryCard(appt = appt, sdf = 
+          -sdf, accentColor = accentColors[index % accentColors.size])   
+      551 +                    val apptInvoices = invoices.filter { it.ap
+          +pointmentId == appt.id }                                      
+      552 +                    AppointmentHistoryCard(                   
+      553 +                        appt = appt,                          
+      554 +                        sdf = sdf,                            
+      555 +                        accentColor = accentColors[index % acc
+          +entColors.size],                                              
+      556 +                        appointmentInvoices = apptInvoices,   
+      557 +                        onViewInvoices = { showInvoicesForAppt
+          + = appt.id }                                                  
+      558 +                    )                                         
+      559                  }
+      560              }
+      561  
+
+● Now add the dialog invocations after the Scaffold block (before the closing }
+  of ClientDetailScreen):
+  Read 1 file (ctrl+o to expand)
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 44 lines
+      595              }
+      596          }
+      597      }
+      598 +                                                              
+      599 +    // ── Diálogo: facturas de una cita ──────────────────────
+          +───────────────────                                           
+      600 +    if (showInvoicesForAppt != null) {                        
+      601 +        val apptInvoices = invoices.filter { it.appointmentId 
+          +== showInvoicesForAppt }                                      
+      602 +        AppointmentInvoicesDialog(                            
+      603 +            invoices = apptInvoices,                          
+      604 +            sdf = sdf,                                        
+      605 +            isLoadingPdf = generatingInvoiceId != null,       
+      606 +            onDismiss = { showInvoicesForAppt = null },       
+      607 +            onViewPdf = { inv ->                              
+      608 +                generatingInvoiceId = inv.id                  
+      609 +                pdfScope.launch {                             
+      610 +                    try {                                     
+      611 +                        val file = invoiceViewModel.generatePd
+          +f(context, inv, companyProfile)                               
+      612 +                        com.gestion.itinerario.ui.invoice.Invo
+          +icePdfGenerator.openPdf(context, file)                        
+      613 +                    } catch (e: Exception) {                  
+      614 +                        android.widget.Toast.makeText(context,
+          + "No se pudo generar el PDF.", android.widget.Toast.LENGTH_LON
+          +G).show()                                                     
+      615 +                    }                                         
+      616 +                    generatingInvoiceId = null                
+      617 +                }                                             
+      618 +            },                                                
+      619 +            onWhatsApp = { inv ->                             
+      620 +                val statusLabel = if (inv.paymentStatus == Pay
+          +mentStatus.PAID) "PAGADO" else "PENDIENTE"                    
+      621 +                openWhatsApp(                                 
+      622 +                    context, client.phone,                    
+      623 +                    "Factura ${inv.invoiceNumber} — Total: \$$
+          +{String.format("%.2f", inv.totalAmount)} — Estado: $statusLabe
+          +l"                                                            
+      624 +                )                                             
+      625 +            },                                                
+      626 +            onEdit = { inv ->                                 
+      627 +                editingInvoice = inv                          
+      628 +                showInvoicesForAppt = null                    
+      629 +            }                                                 
+      630 +        )                                                     
+      631 +    }                                                         
+      632 +    if (editingInvoice != null) {                             
+      633 +        InvoiceUpdateDialog(                                  
+      634 +            invoice = editingInvoice!!,                       
+      635 +            onDismiss = { editingInvoice = null },            
+      636 +            onSave = { updated ->                             
+      637 +                invoiceViewModel.updateInvoice(updated)       
+      638 +                editingInvoice = null                         
+      639 +            }                                                 
+      640 +        )                                                     
+      641 +    }                                                         
+      642  }
+      643  
+      644  // ── Tile de estadística (Equipos / Facturas) ───────────────
+           ───────────────────
+
+● Now modify AppointmentHistoryCard to accept the new params and show "Ver
+  facturas" button:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 7 lines, removed 1 line
+      791  
+      792  // ─── Tarjeta historial cita ────────────────────────────────
+           ───────────────────
+      793  @Composable
+      794 -private fun AppointmentHistoryCard(appt: Appointment, sdf: Sim
+          -pleDateFormat, accentColor: Color = Tertiary40) {             
+      794 +private fun AppointmentHistoryCard(                           
+      795 +    appt: Appointment,                                        
+      796 +    sdf: SimpleDateFormat,                                    
+      797 +    accentColor: Color = Tertiary40,                          
+      798 +    appointmentInvoices: List<Invoice> = emptyList(),         
+      799 +    onViewInvoices: () -> Unit = {}                           
+      800 +) {                                                           
+      801      val (statusColor, statusLabel) = when (appt.status) {
+      802          AppointmentStatus.SCHEDULED   -> StatusPending   to "P
+           ROGRAMADA"
+      803          AppointmentStatus.IN_PROGRESS -> StatusInRepair  to "E
+           N PROCESO"
+
+● Now add the "Ver facturas" button inside the card (before Column closes):
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 17 lines
+      864                      Text(appt.notes,
+      865                          style = MaterialTheme.typography.bodyS
+           mall,
+      866                          color = MaterialTheme.colorScheme.onSu
+           rfaceVariant)
+      867 +                if (appointmentInvoices.isNotEmpty()) {       
+      868 +                    Spacer(Modifier.height(4.dp))             
+      869 +                    OutlinedButton(                           
+      870 +                        onClick = onViewInvoices,             
+      871 +                        modifier = Modifier.align(Alignment.En
+          +d),                                                           
+      872 +                        shape = RoundedCornerShape(50),       
+      873 +                        border = BorderStroke(1.dp, Primary40)
+      874 +                    ) {                                       
+      875 +                        Icon(Icons.Default.Receipt, null, modi
+          +fier = Modifier.size(15.dp), tint = Primary40)                
+      876 +                        Spacer(Modifier.width(6.dp))          
+      877 +                        Text(                                 
+      878 +                            "Ver facturas (${appointmentInvoic
+          +es.size})",                                                   
+      879 +                            style = MaterialTheme.typography.l
+          +abelSmall,                                                    
+      880 +                            color = Primary40                 
+      881 +                        )                                     
+      882 +                    }                                         
+      883 +                }                                             
+      884              }
+      885          }
+      886      }
+
+● Now add the two new composable functions (AppointmentInvoicesDialog and
+  InvoiceUpdateDialog + InvoicePill) after InvoiceHistoryCard:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Added 214 lines
+       956      }
+       957  }
+       958  
+       959 +// ─── Diálogo: lista de facturas de una cita ───────────────
+           +────────────────────                                         
+       960  @Composable
+       961 +private fun AppointmentInvoicesDialog(                       
+       962 +    invoices: List<Invoice>,                                 
+       963 +    sdf: SimpleDateFormat,                                   
+       964 +    isLoadingPdf: Boolean,                                   
+       965 +    onDismiss: () -> Unit,                                   
+       966 +    onViewPdf: (Invoice) -> Unit,                            
+       967 +    onWhatsApp: (Invoice) -> Unit,                           
+       968 +    onEdit: (Invoice) -> Unit                                
+       969 +) {                                                          
+       970 +    Dialog(onDismissRequest = onDismiss, properties = DialogP
+           +roperties(usePlatformDefaultWidth = false)) {                
+       971 +        Surface(                                             
+       972 +            modifier = Modifier.fillMaxWidth().padding(horizo
+           +ntal = 20.dp),                                               
+       973 +            shape = RoundedCornerShape(24.dp),               
+       974 +            color = Color.White                              
+       975 +        ) {                                                  
+       976 +            Column(                                          
+       977 +                modifier = Modifier.padding(24.dp).verticalSc
+           +roll(rememberScrollState()),                                 
+       978 +                verticalArrangement = Arrangement.spacedBy(12
+           +.dp)                                                         
+       979 +            ) {                                              
+       980 +                Row(verticalAlignment = Alignment.CenterVerti
+           +cally, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+       981 +                    Box(                                     
+       982 +                        modifier = Modifier.size(44.dp).clip(
+           +RoundedCornerShape(12.dp)).background(Primary40),            
+       983 +                        contentAlignment = Alignment.Center  
+       984 +                    ) { Icon(Icons.Default.Receipt, null, tin
+           +t = Color.White, modifier = Modifier.size(24.dp)) }          
+       985 +                    Column {                                 
+       986 +                        Text("Facturas del servicio", style =
+           + MaterialTheme.typography.titleMedium, fontWeight = FontWeigh
+           +t.Bold)                                                      
+       987 +                        Text("${invoices.size} factura(s)", s
+           +tyle = MaterialTheme.typography.bodySmall, color = MaterialTh
+           +eme.colorScheme.onSurfaceVariant)                            
+       988 +                    }                                        
+       989 +                }                                            
+       990 +                HorizontalDivider()                          
+       991 +                                                             
+       992 +                invoices.forEach { inv ->                    
+       993 +                    val (pColor, pLabel) = when (inv.paymentS
+           +tatus) {                                                     
+       994 +                        PaymentStatus.PAID    -> StatusComple
+           +ted to "PAGADO"                                              
+       995 +                        PaymentStatus.PENDING -> Color(0xFFE6
+           +5100) to "PENDIENTE"                                         
+       996 +                        else                  -> MaterialThem
+           +e.colorScheme.onSurfaceVariant to "SIN ESTADO"               
+       997 +                    }                                        
+       998 +                    Surface(shape = RoundedCornerShape(14.dp)
+           +, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha
+           + = 0.4f)) {                                                  
+       999 +                        Column(modifier = Modifier.fillMaxWid
+           +th().padding(12.dp), verticalArrangement = Arrangement.spaced
+           +By(6.dp)) {                                                  
+      1000 +                            Row(verticalAlignment = Alignment
+           +.CenterVertically) {                                         
+      1001 +                                Text(inv.invoiceNumber, modif
+           +ier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold) 
+      1002 +                                Surface(shape = RoundedCorner
+           +Shape(6.dp), color = pColor.copy(alpha = 0.14f)) {           
+      1003 +                                    Text(pLabel, modifier = M
+           +odifier.padding(horizontal = 6.dp, vertical = 2.dp),         
+      1004 +                                        style = MaterialTheme
+           +.typography.labelSmall, fontWeight = FontWeight.Bold, color =
+           + pColor)                                                     
+      1005 +                                }                            
+      1006 +                            }                                
+      1007 +                            Row(verticalAlignment = Alignment
+           +.CenterVertically) {                                         
+      1008 +                                Text("\$${String.format("%.2f
+           +", inv.totalAmount)}",                                       
+      1009 +                                    style = MaterialTheme.typ
+           +ography.titleSmall, fontWeight = FontWeight.Bold,            
+      1010 +                                    color = Primary40, modifi
+           +er = Modifier.weight(1f))                                    
+      1011 +                                Text(sdf.format(java.util.Dat
+           +e(inv.createdAt)),                                           
+      1012 +                                    style = MaterialTheme.typ
+           +ography.labelSmall,                                          
+      1013 +                                    color = MaterialTheme.col
+           +orScheme.onSurfaceVariant)                                   
+      1014 +                            }                                
+      1015 +                            Row(modifier = Modifier.fillMaxWi
+           +dth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { 
+      1016 +                                OutlinedButton(              
+      1017 +                                    onClick = { onViewPdf(inv
+           +) }, enabled = !isLoadingPdf,                                
+      1018 +                                    modifier = Modifier.weigh
+           +t(1f), shape = RoundedCornerShape(50)                        
+      1019 +                                ) {                          
+      1020 +                                    Icon(Icons.Default.Pictur
+           +eAsPdf, null, modifier = Modifier.size(14.dp), tint = Primary
+           +80)                                                          
+      1021 +                                    Spacer(Modifier.width(4.d
+           +p))                                                          
+      1022 +                                    Text("PDF", style = Mater
+           +ialTheme.typography.labelSmall)                              
+      1023 +                                }                            
+      1024 +                                OutlinedButton(              
+      1025 +                                    onClick = { onWhatsApp(in
+           +v) },                                                        
+      1026 +                                    modifier = Modifier.weigh
+           +t(1f), shape = RoundedCornerShape(50)                        
+      1027 +                                ) {                          
+      1028 +                                    androidx.compose.ui.graph
+           +ics.painter.Painter                                          
+      1029 +                                    Icon(androidx.compose.ui.
+           +res.painterResource(com.gestion.itinerario.R.drawable.ic_what
+           +sapp),                                                       
+      1030 +                                        null, modifier = Modi
+           +fier.size(14.dp), tint = WhatsAppGreen)                      
+      1031 +                                    Spacer(Modifier.width(4.d
+           +p))                                                          
+      1032 +                                    Text("WS", style = Materi
+           +alTheme.typography.labelSmall)                               
+      1033 +                                }                            
+      1034 +                                Button(                      
+      1035 +                                    onClick = { onEdit(inv) }
+           +,                                                            
+      1036 +                                    modifier = Modifier.weigh
+           +t(1f), shape = RoundedCornerShape(50),                       
+      1037 +                                    colors = ButtonDefaults.b
+           +uttonColors(containerColor = Color.Transparent),             
+      1038 +                                    contentPadding = PaddingV
+           +alues(0.dp)                                                  
+      1039 +                                ) {                          
+      1040 +                                    Box(                     
+      1041 +                                        modifier = Modifier.f
+           +illMaxWidth()                                                
+      1042 +                                            .background(Brush
+           +.linearGradient(listOf(Primary40, Secondary40)), RoundedCorne
+           +rShape(50))                                                  
+      1043 +                                            .padding(vertical
+           + = 8.dp),                                                    
+      1044 +                                        contentAlignment = Al
+           +ignment.Center                                               
+      1045 +                                    ) { Text("Editar", style 
+           += MaterialTheme.typography.labelSmall, color = Color.White) }
+      1046 +                                }                            
+      1047 +                            }                                
+      1048 +                        }                                    
+      1049 +                    }                                        
+      1050 +                }                                            
+      1051 +                                                             
+      1052 +                HorizontalDivider()                          
+      1053 +                TextButton(onClick = onDismiss, modifier = Mo
+           +difier.align(Alignment.End)) { Text("Cerrar") }              
+      1054 +            }                                                
+      1055 +        }                                                    
+      1056 +    }                                                        
+      1057 +}                                                            
+      1058 +                                                             
+      1059 +// ─── Diálogo: actualizar factura existente ────────────────
+           +────────────────────                                         
+      1060 +@Composable                                                  
+      1061 +private fun InvoiceUpdateDialog(invoice: Invoice, onDismiss: 
+           +() -> Unit, onSave: (Invoice) -> Unit) {                     
+      1062 +    val baseAmount = invoice.items.firstOrNull()?.unitPrice ?
+           +: (invoice.totalAmount / (1.0 + invoice.taxRate / 100.0))    
+      1063 +    var subtotalStr    by remember { mutableStateOf(String.fo
+           +rmat("%.2f", baseAmount)) }                                  
+      1064 +    var taxRateStr     by remember { mutableStateOf(String.fo
+           +rmat("%.0f", invoice.taxRate)) }                             
+      1065 +    var paymentMethod  by remember { mutableStateOf(invoice.p
+           +aymentMethod) }                                              
+      1066 +    var paymentStatus  by remember { mutableStateOf(invoice.p
+           +aymentStatus) }                                              
+      1067 +    var paymentTerms   by remember { mutableStateOf(invoice.p
+           +aymentTerms) }                                               
+      1068 +                                                             
+      1069 +    Dialog(onDismissRequest = onDismiss, properties = DialogP
+           +roperties(usePlatformDefaultWidth = false)) {                
+      1070 +        Surface(                                             
+      1071 +            modifier = Modifier.fillMaxWidth().padding(horizo
+           +ntal = 20.dp),                                               
+      1072 +            shape = RoundedCornerShape(24.dp),               
+      1073 +            color = Color.White                              
+      1074 +        ) {                                                  
+      1075 +            Column(                                          
+      1076 +                modifier = Modifier.padding(24.dp).verticalSc
+           +roll(rememberScrollState()),                                 
+      1077 +                verticalArrangement = Arrangement.spacedBy(14
+           +.dp)                                                         
+      1078 +            ) {                                              
+      1079 +                Row(verticalAlignment = Alignment.CenterVerti
+           +cally, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      1080 +                    Box(                                     
+      1081 +                        modifier = Modifier.size(44.dp).clip(
+           +RoundedCornerShape(12.dp)).background(Primary40),            
+      1082 +                        contentAlignment = Alignment.Center  
+      1083 +                    ) { Icon(Icons.Default.Edit, null, tint =
+           + Color.White, modifier = Modifier.size(24.dp)) }             
+      1084 +                    Column {                                 
+      1085 +                        Text("Actualizar Factura", style = Ma
+           +terialTheme.typography.titleMedium, fontWeight = FontWeight.B
+           +old)                                                         
+      1086 +                        Text(invoice.invoiceNumber, style = M
+           +aterialTheme.typography.bodySmall, color = MaterialTheme.colo
+           +rScheme.onSurfaceVariant)                                    
+      1087 +                    }                                        
+      1088 +                }                                            
+      1089 +                HorizontalDivider()                          
+      1090 +                                                             
+      1091 +                OutlinedTextField(                           
+      1092 +                    value = subtotalStr, onValueChange = { su
+           +btotalStr = it },                                            
+      1093 +                    label = { Text("Subtotal") },            
+      1094 +                    prefix = { Text("$") },                  
+      1095 +                    keyboardOptions = androidx.compose.founda
+           +tion.text.KeyboardOptions(keyboardType = KeyboardType.Decimal
+           +),                                                           
+      1096 +                    modifier = Modifier.fillMaxWidth(), singl
+           +eLine = true,                                                
+      1097 +                    shape = RoundedCornerShape(12.dp)        
+      1098 +                )                                            
+      1099 +                OutlinedTextField(                           
+      1100 +                    value = taxRateStr, onValueChange = { tax
+           +RateStr = it },                                              
+      1101 +                    label = { Text("IVA (%)") },             
+      1102 +                    keyboardOptions = androidx.compose.founda
+           +tion.text.KeyboardOptions(keyboardType = KeyboardType.Decimal
+           +),                                                           
+      1103 +                    modifier = Modifier.fillMaxWidth(), singl
+           +eLine = true,                                                
+      1104 +                    shape = RoundedCornerShape(12.dp)        
+      1105 +                )                                            
+      1106 +                                                             
+      1107 +                Text("Método de pago", style = MaterialTheme.
+           +typography.labelMedium, fontWeight = FontWeight.SemiBold, col
+           +or = MaterialTheme.colorScheme.onSurfaceVariant)             
+      1108 +                Row(modifier = Modifier.fillMaxWidth(), horiz
+           +ontalArrangement = Arrangement.spacedBy(8.dp)) {             
+      1109 +                    listOf(PaymentMethod.CASH to "Efectivo", 
+           +PaymentMethod.TRANSFER to "Transferencia", PaymentMethod.NONE
+           + to "Sin método").forEach { (m, lbl) ->                      
+      1110 +                        InvoicePill(label = lbl, selected = p
+           +aymentMethod == m, onClick = { paymentMethod = m }, modifier 
+           += Modifier.weight(1f))                                       
+      1111 +                    }                                        
+      1112 +                }                                            
+      1113 +                                                             
+      1114 +                Text("Estado de pago", style = MaterialTheme.
+           +typography.labelMedium, fontWeight = FontWeight.SemiBold, col
+           +or = MaterialTheme.colorScheme.onSurfaceVariant)             
+      1115 +                Row(modifier = Modifier.fillMaxWidth(), horiz
+           +ontalArrangement = Arrangement.spacedBy(8.dp)) {             
+      1116 +                    listOf(PaymentStatus.PAID to "Pagado", Pa
+           +ymentStatus.PENDING to "Pendiente", PaymentStatus.NONE to "Si
+           +n estado").forEach { (s, lbl) ->                             
+      1117 +                        InvoicePill(label = lbl, selected = p
+           +aymentStatus == s, onClick = { paymentStatus = s }, modifier 
+           += Modifier.weight(1f))                                       
+      1118 +                    }                                        
+      1119 +                }                                            
+      1120 +                                                             
+      1121 +                OutlinedTextField(                           
+      1122 +                    value = paymentTerms, onValueChange = { p
+           +aymentTerms = it },                                          
+      1123 +                    label = { Text("Condición de pago") },   
+      1124 +                    modifier = Modifier.fillMaxWidth(), singl
+           +eLine = true,                                                
+      1125 +                    shape = RoundedCornerShape(12.dp)        
+      1126 +                )                                            
+      1127 +                                                             
+      1128 +                HorizontalDivider()                          
+      1129 +                Row(modifier = Modifier.fillMaxWidth(), horiz
+           +ontalArrangement = Arrangement.spacedBy(12.dp)) {            
+      1130 +                    OutlinedButton(onClick = onDismiss, modif
+           +ier = Modifier.weight(1f), shape = RoundedCornerShape(50)) { 
+           +Text("Cancelar") }                                           
+      1131 +                    Button(                                  
+      1132 +                        onClick = {                          
+      1133 +                            val subtotal = subtotalStr.toDoub
+           +leOrNull() ?: baseAmount                                     
+      1134 +                            val tax = taxRateStr.toDoubleOrNu
+           +ll() ?: invoice.taxRate                                      
+      1135 +                            val total = subtotal + subtotal *
+           + (tax / 100.0)                                               
+      1136 +                            val updatedItems = listOf(       
+      1137 +                                invoice.items.firstOrNull()?.
+           +copy(unitPrice = subtotal, amount = subtotal)                
+      1138 +                                    ?: InvoiceItem(descriptio
+           +n = invoice.serviceDescription, quantity = 1.0, unit = "Servi
+           +cio", unitPrice = subtotal, amount = subtotal)               
+      1139 +                            )                                
+      1140 +                            onSave(invoice.copy(totalAmount =
+           + total, taxRate = tax, paymentMethod = paymentMethod, payment
+           +Status = paymentStatus, paymentTerms = paymentTerms.trim(), i
+           +tems = updatedItems))                                        
+      1141 +                        },                                   
+      1142 +                        modifier = Modifier.weight(1f), shape
+           + = RoundedCornerShape(50),                                   
+      1143 +                        colors = ButtonDefaults.buttonColors(
+           +containerColor = Color.Transparent),                         
+      1144 +                        contentPadding = PaddingValues(0.dp) 
+      1145 +                    ) {                                      
+      1146 +                        Box(                                 
+      1147 +                            modifier = Modifier.fillMaxWidth(
+           +)                                                            
+      1148 +                                .background(Brush.linearGradi
+           +ent(listOf(Primary40, Secondary40)), RoundedCornerShape(50)) 
+      1149 +                                .padding(vertical = 12.dp),  
+      1150 +                            contentAlignment = Alignment.Cent
+           +er                                                           
+      1151 +                        ) { Text("Actualizar", color = Color.
+           +White, fontWeight = FontWeight.SemiBold) }                   
+      1152 +                    }                                        
+      1153 +                }                                            
+      1154 +            }                                                
+      1155 +        }                                                    
+      1156 +    }                                                        
+      1157 +}                                                            
+      1158 +                                                             
+      1159 +@Composable                                                  
+      1160 +private fun InvoicePill(label: String, selected: Boolean, onC
+           +lick: () -> Unit, modifier: Modifier = Modifier) {           
+      1161 +    Surface(onClick = onClick, shape = RoundedCornerShape(50)
+           +, color = if (selected) Color.Transparent else Color(0xFFF0F0
+           +F0), modifier = modifier) {                                  
+      1162 +        Box(                                                 
+      1163 +            modifier = Modifier.fillMaxWidth()               
+      1164 +                .then(if (selected) Modifier.background(Brush
+           +.linearGradient(listOf(Primary40, Secondary40)), RoundedCorne
+           +rShape(50)) else Modifier)                                   
+      1165 +                .padding(vertical = 10.dp),                  
+      1166 +            contentAlignment = Alignment.Center              
+      1167 +        ) {                                                  
+      1168 +            Text(label, style = MaterialTheme.typography.labe
+           +lMedium, fontWeight = if (selected) FontWeight.Bold else Font
+           +Weight.Normal, color = if (selected) Color.White else Color(0
+           +xFF6B6B6B))                                                  
+      1169 +        }                                                    
+      1170 +    }                                                        
+      1171 +}                                                            
+      1172 +                                                             
+      1173 +@Composable                                                  
+      1174  fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVe
+            ctor, text: String) {
+      1175      Row(verticalAlignment = Alignment.CenterVertically, horiz
+            ontalArrangement = Arrangement.spacedBy(8.dp)) {
+      1176          Icon(icon, null, tint = Primary80, modifier = Modifie
+            r.size(18.dp))
+
+● I need to fix a stray expression in the dialog. Let me remove it:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\clients\ClientsScreen.kt)
+  ⎿  Removed 1 line
+      1025                                      onClick = { onWhatsApp(in
+            v) },
+      1026                                      modifier = Modifier.weigh
+            t(1f), shape = RoundedCornerShape(50)
+      1027                                  ) {
+      1028 -                                    androidx.compose.ui.graph
+           -ics.painter.Painter                                          
+      1028                                      Icon(androidx.compose.ui.
+            res.painterResource(com.gestion.itinerario.R.drawable.ic_what
+            sapp),
+      1029                                          null, modifier = Modi
+            fier.size(14.dp), tint = WhatsAppGreen)
+      1030                                      Spacer(Modifier.width(4.d
+            p))
+
+● Now build to check for errors:
+
+  Read 1 file, ran 3 shell commands (ctrl+o to expand)
+
+● Waiting for the build to complete.
+
+  Read 1 file (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+  Read 1 file, ran 2 shell commands (ctrl+o to expand)
+
+● Background command "Build debug APK with corrected JAVA_HOME" completed (exit code 0)
+
+● The first build succeeded (exit code 0). Let me read the output to confirm:
+
+  Read 1 file (ctrl+o to expand)
+
+● BUILD SUCCESSFUL. Only deprecation warnings, zero errors. Let me locate the
+  APK:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● El APK está en app\build\outputs\apk\debug\app-debug.apk.
+
+  ---
+  Todo compiló sin errores. Resumen de los cambios implementados:
+
+  1. FAB "Nueva Cita" en Servicios — El botón + en la pantalla de Servicios
+  ahora abre el mismo diálogo de "Nueva Cita" que en Agenda
+  (showAppointmentDialog = true), en vez del formulario complejo de Orden de
+  Servicio.
+
+  2. Factura más rápida — ProfileRepository.incrementCounter() ahora lee el
+  contador primero desde caché local (Source.CACHE), con fallback a red. Elimina
+  el delay de hasta 12 segundos que causaba timeouts al crear facturas sin
+  conexión estable.
+
+  3. Historial de facturas por cita — En el detalle del cliente, cada tarjeta de
+  servicio muestra un botón "Ver facturas (N)" si tiene facturas vinculadas por
+  appointmentId. Al tocarlo:
+  - Se abre un diálogo con todas las facturas de ese servicio
+  - Cada factura tiene botones: PDF, WhatsApp (envía resumen al cliente) y
+  Editar
+  - Editar abre un diálogo que permite actualizar: subtotal, IVA %, método de
+  pago, estado de pago y condición de pago — ideal para cuotas
+
+  4. updateInvoice() — Nuevo método en InvoiceViewModel que guarda la factura
+  con su ID existente (actualización en lugar de creación nueva).
+
+  Para instalar el APK: copia app\build\outputs\apk\debug\app-debug.apk al
+  teléfono e instálalo (activar "Fuentes desconocidas" si es necesario).
+
+✻ Cooked for 29m 52s
+
+✻ Claude resuming /loop wakeup (Jun 10 6:59am)
+
+● El build ya fue verificado — BUILD SUCCESSFUL sin errores de compilación. Solo
+  hay warnings de deprecación menores (iconos ArrowBack, StickyNote2 que ya
+  existían antes).
+
+  El APK compilado está en:
+  app\build\outputs\apk\debug\app-debug.apk
+
+  Instálalo en el teléfono para probar todos los cambios de esta sesión.
+✻ Cooked for 4s
+
+● Background command "Compile Kotlin sources (faster than full build)" completed
+(exit code 0)
+
+● La compilación secundaria también terminó con éxito (exit code 0). Todo está
+  limpio.
+
+✻ Sautéed for 2s
+
+> ok ya probe y tengo en cuenta a tomar los siguientes detalles en cuanto a la  
+  factura 1) quitemos ese encabezado azul colo dejemos la letra y de ese color  
+  del encabezado quitando el encabezad, el logo debe de ir en la parte          
+  izquierda y de lado derecho el nombre de la empresa abajo el rif no es nit    
+  sino rif al lado el telefono y debajo la ubicacion abajo de eso haras como    
+  una linea divisoria del color para separar asi como la linea divisoria entre  
+  datos del cliente y los datos del mismo  y debajo de esta colocaras facutra   
+  de serivicio el id de la factura y la fecha otra cosa en cuanto a la firma    
+  del cliente esta no se esta posicionando ni mucho menos viendo completa debe  
+  posicionarse en la liena de la firma  y mostrarse completa. en la carpeta     
+  revisar esta la captura con el nombre fac-pdf-error para que veas como esta y 
+  en base a mis lineamientos como debes corregirla. por otra parte mejorar la   
+  ventana de agenda estos son los cambios 1) el boton de agg nueva cita debe    
+  tener un + para mantener concordancia con la otra ventana 2) el fondo donde   
+  ven los serivico y muestra el calendario quita ese rosaceo feo y colocalo     
+  blanco 3) al estar parado sobre el dia actual guiate de la img de ejemplo con 
+  el nombre screen 6 donde esta parte se muestra   de forma que sobre el dia    
+  actual lo muestre en una forma redonda con un degradado esto segun el tema    
+  elegido 3) en cuanto a los colores de citas o mantenimiento los colores no    
+  deben ser siempre en azul y y verde sino segun el tema elegido que coincida   
+  con los colores del tema para este caso ok? 4) en las citas del dia debe de   
+  mantenerse el color respetandolo como en las otras pantallas es decir en      
+  pendiente debe marcarse color amarillo en proceso color naranja y finalizado  
+  si el color verde respetando ese orden de colores 5) por otra parte se debe   
+  quitar ese espacio adicional que hay en la parte drecha donde ese espacio de  
+  mas 6) en las citas del dia de hoy para todas partes deberian de salir las    
+  rutas, es decir en la parte inferior de cada box de cada cita del dia se debe 
+  colocar cuanto tiempo (en forma regresiva) falta para la cita ademas de que   
+  por cada caso indicarme la ruta por cada una si entendiste todo haz un cuadro 
+  con todos los cambios que se deben aplicar                                    
+
+● Antes de implementar, déjame ver las capturas de referencia y el código del
+  generador de PDF.
+
+  Read 4 files (ctrl+o to expand)
+
+● Ahora leo la AgendaScreen para entender los cambios necesarios:
+
+  Read 1 file (ctrl+o to expand)
+
+● Analicé todo. Aquí el cuadro con todos los cambios que aplicaré:
+
+  ┌────────┬───────────────┬────────────────────────────────────────────────┐
+  │   #    │     Área      │                     Cambio                     │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ PDF    │               │                                                │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ P1     │ Encabezado    │ Quitar el rectángulo azul de fondo; solo texto │
+  │        │               │  en color                                      │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │        │ Layout        │ Logo a la izquierda; nombre empresa, RIF+Tel   │
+  │ P2     │ empresa       │ (misma línea), dirección — a la derecha del    │
+  │        │               │ logo                                           │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ P3     │ Etiqueta      │ "NIT" → "RIF"                                  │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ P4     │ Divisor       │ Línea azul de 2px entre encabezado y cuerpo de │
+  │        │               │  la factura                                    │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ P5     │ Título        │ "FACTURA DE SERVICIO" + número + fecha debajo  │
+  │        │               │ del divisor                                    │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ P6     │ Firma         │ Bitmap alineado sobre la línea (borde inferior │
+  │        │               │  del bitmap = línea), se muestra completa      │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ Agenda │               │                                                │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A1     │ FAB           │ Ícono + en vez de EventAvailable               │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A2     │ Fondo         │ Fondo blanco en el LazyColumn (quita el        │
+  │        │               │ rosáceo)                                       │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A3     │ Día actual    │ Siempre circular con degradado del tema,       │
+  │        │               │ incluso al estar seleccionado                  │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A4     │ Colores       │ Primary40 para citas, Secondary40 para         │
+  │        │ cita/mant.    │ mantenimiento                                  │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A5     │ Colores de    │ Programada → amarillo, En proceso → naranja,   │
+  │        │ estado        │ Finalizado → verde                             │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A6     │ Espacio       │ Quitar padding(end = 36dp) que generaba el     │
+  │        │ derecho       │ hueco innecesario                              │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A7     │ Countdown     │ Chip con cuenta regresiva por cita activa ("en │
+  │        │               │  2h 15m")                                      │
+  ├────────┼───────────────┼────────────────────────────────────────────────┤
+  │ A8     │ Ruta          │ Botón "Ruta" por cita que abre Google Maps a   │
+  │        │ individual    │ la dirección del cliente                       │
+  └────────┴───────────────┴────────────────────────────────────────────────┘
+
+  Implementando todo ahora:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\InvoicePdfGenerator
+        .kt)
+  ⎿  Added 31 lines, removed 31 lines
+      42          val marginR = 555f
+      43          val pageW = 595f
+      44  
+      45 -        // ── Encabezado azul ─────────────────────────────────
+         -─────────────────                                              
+      46 -        canvas.drawRect(0f, 0f, pageW, 80f, bluePaint)         
+      45 +        // ── Encabezado: Logo izquierda + Datos empresa derech
+         +a ─────────────────                                            
+      46 +        val themeBlue = Color.rgb(21, 101, 192)                
+      47 +        var infoX = marginL                                    
+      48  
+      48 -        // Logo empresa (esquina superior derecha) — si existe 
+      49 -        val logoAreaRight = pageW - marginL                    
+      50 -        val logoAreaLeft: Float                                
+      49 +        // Logo empresa (lado izquierdo)                       
+      50          if (logoBitmap != null) {
+      51              val logoH = 60f
+      52              val logoW = (logoBitmap.width.toFloat() / logoBitma
+          p.height.toFloat()) * logoH
+      53              val scaledLogo = Bitmap.createScaledBitmap(logoBitm
+          ap, logoW.toInt(), logoH.toInt(), true)
+      55 -            val logoLeft = pageW - logoW - marginL             
+      56 -            canvas.drawBitmap(scaledLogo, logoLeft, 10f, null) 
+      57 -            logoAreaLeft = logoLeft - 8f                       
+      58 -        } else {                                               
+      59 -            logoAreaLeft = pageW - marginL                     
+      54 +            canvas.drawBitmap(scaledLogo, marginL, 10f, null)  
+      55 +            infoX = marginL + logoW + 14f                      
+      56          }
+      57  
+      62 -        // Nombre empresa (izquierda)                          
+      63 -        titlePaint.color = Color.WHITE                         
+      64 -        titlePaint.textSize = 18f                              
+      65 -        canvas.drawText(profile.companyName.ifBlank { "Mi Empre
+         -sa" }, marginL, 35f, titlePaint)                               
+      66 -        normalPaint.color = Color.WHITE; normalPaint.textSize =
+         - 10f                                                           
+      58 +        // Nombre empresa a la derecha del logo                
+      59          val taxIdToShow = invoice.companyTaxId.ifBlank { profil
+          e.taxId }
+      68 -        val line2 = buildString {                              
+      69 -            if (taxIdToShow.isNotBlank()) append("NIT: $taxIdTo
+         -Show")                                                         
+      60 +        titlePaint.color = themeBlue; titlePaint.textSize = 17f
+      61 +        canvas.drawText(profile.companyName.ifBlank { "Mi Empre
+         +sa" }, infoX, 30f, titlePaint)                                 
+      62 +                                                               
+      63 +        // RIF + Tel en la misma línea                         
+      64 +        normalPaint.color = Color.DKGRAY; normalPaint.textSize 
+         += 10f                                                          
+      65 +        val rifTelLine = buildString {                         
+      66 +            if (taxIdToShow.isNotBlank()) append("RIF: $taxIdTo
+         +Show")                                                         
+      67              if (profile.phone.isNotBlank()) { if (isNotEmpty())
+           append("  ·  "); append("Tel: ${profile.phone}") }
+      68          }
+      72 -        if (line2.isNotBlank()) canvas.drawText(line2, marginL,
+         - 52f, normalPaint)                                             
+      73 -        if (profile.address.isNotBlank()) canvas.drawText(profi
+         -le.address.take(50), marginL, 66f, normalPaint)                
+      69 +        if (rifTelLine.isNotBlank()) canvas.drawText(rifTelLine
+         +, infoX, 46f, normalPaint)                                     
+      70 +        if (profile.address.isNotBlank()) {                    
+      71 +            normalPaint.textSize = 9f                          
+      72 +            canvas.drawText(profile.address.take(60), infoX, 60
+         +f, normalPaint)                                                
+      73 +        }                                                      
+      74  
+      75 -        // Número de factura — se ubica a la izquierda del logo
+         - si hay logo, o al borde derecho                               
+      76 -        boldPaint.color = Color.WHITE; boldPaint.textSize = 12f
+      77 -        val facLabel = "FACTURA DE SERVICIO"                   
+      78 -        val facW = boldPaint.measureText(facLabel)             
+      79 -        val facX = if (logoBitmap != null) marginL + (logoAreaL
+         -eft - marginL - facW) / 2f                                     
+      80 -                   else logoAreaRight - facW                   
+      81 -        canvas.drawText(facLabel, facX.coerceAtLeast(marginL), 
+         -35f, boldPaint)                                                
+      82 -        normalPaint.textSize = 11f; normalPaint.color = Color.r
+         -gb(220, 240, 255)                                              
+      83 -        val numW = normalPaint.measureText(invoice.invoiceNumbe
+         -r)                                                             
+      84 -        canvas.drawText(invoice.invoiceNumber, facX.coerceAtLea
+         -st(marginL), 52f, normalPaint)                                 
+      75 +        // Línea divisora del tema                             
+      76 +        canvas.drawLine(marginL, 76f, marginR, 76f, linePaint.a
+         +pply { color = themeBlue; strokeWidth = 2f })                  
+      77 +                                                               
+      78 +        // Factura de Servicio + Número + Fecha (debajo de la l
+         +ínea divisora)                                                 
+      79 +        boldPaint.color = themeBlue; boldPaint.textSize = 13f  
+      80 +        canvas.drawText("FACTURA DE SERVICIO", marginL, 93f, bo
+         +ldPaint)                                                       
+      81 +        normalPaint.color = Color.rgb(60, 60, 60); normalPaint.
+         +textSize = 11f                                                 
+      82 +        val invNumW = normalPaint.measureText(invoice.invoiceNu
+         +mber)                                                          
+      83 +        canvas.drawText(invoice.invoiceNumber, marginR - invNum
+         +W, 93f, normalPaint)                                           
+      84 +        normalPaint.color = Color.DKGRAY; normalPaint.textSize 
+         += 10f                                                          
+      85          val dateStr = "Fecha: ${sdf.format(Date(invoice.endDate
+          .takeIf { it > 0 } ?: invoice.createdAt))}"
+      86 -        canvas.drawText(dateStr, facX.coerceAtLeast(marginL), 6
+         -6f, normalPaint)                                               
+      86 +        canvas.drawText(dateStr, marginR - normalPaint.measureT
+         +ext(dateStr), 107f, normalPaint)                               
+      87  
+      88 -        y = 100f                                               
+      88 +        y = 122f                                               
+      89  
+      90          // ── Datos del cliente ───────────────────────────────
+          ─────────────────
+      91          boldPaint.color = Color.rgb(21, 101, 192); boldPaint.te
+          xtSize = 12f
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\InvoicePdfGenerator
+        .kt)
+  ⎿  Added 10 lines, removed 9 lines
+      193              y += 8f
+      194              boldPaint.color = Color.rgb(21, 101, 192); boldPai
+           nt.textSize = 11f
+      195              canvas.drawText("FIRMA DEL CLIENTE", marginL, y, b
+           oldPaint)
+      196 -            y += 8f                                           
+      196 +            y += 12f                                          
+      197 +            // Reservar área: la línea va al fondo del área y 
+          +la firma se posiciona encima, alineada                        
+      198 +            val sigAreaH = 68f                                
+      199 +            val lineY = y + sigAreaH                          
+      200 +            canvas.drawLine(marginL, lineY, marginL + 160f, li
+          +neY, linePaint.apply { color = Color.DKGRAY; strokeWidth = 1f 
+          +})                                                            
+      201              try {
+      202                  val sigBytes = Base64.decode(invoice.clientSig
+           nature, Base64.DEFAULT)
+      203                  val sigBmp = BitmapFactory.decodeByteArray(sig
+           Bytes, 0, sigBytes.size)
+      204                  if (sigBmp != null) {
+      201 -                    val sigH = 80f                            
+      205 +                    val sigH = minOf(sigAreaH - 8f, 58f)      
+      206                      val sigW = (sigBmp.width.toFloat() / sigBm
+           p.height.toFloat()) * sigH
+      203 -                    canvas.drawBitmap(                        
+      204 -                        Bitmap.createScaledBitmap(sigBmp, sigW
+          -.toInt(), sigH.toInt(), true),                                
+      205 -                        marginL, y, null                      
+      206 -                    )                                         
+      207 +                    val scaledSig = Bitmap.createScaledBitmap(
+          +sigBmp, sigW.toInt(), sigH.toInt(), true)                     
+      208 +                    // Borde inferior de la firma = línea de f
+          +irma                                                          
+      209 +                    canvas.drawBitmap(scaledSig, marginL, line
+          +Y - sigH - 2f, null)                                          
+      210                  }
+      211              } catch (_: Exception) {}
+      209 -            y += 90f                                          
+      210 -            canvas.drawLine(marginL, y, marginL + 160f, y, lin
+          -ePaint.apply { color = Color.DKGRAY; strokeWidth = 1f })      
+      211 -            y += 12f                                          
+      212 +            y = lineY + 14f                                   
+      213              normalPaint.color = Color.DKGRAY; normalPaint.text
+           Size = 9f
+      214              canvas.drawText(invoice.clientName, marginL, y, no
+           rmalPaint)
+      215              y += 20f
+
+● Ahora los cambios de Agenda, empezando por los más simples:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 2 lines, removed 2 lines
+      59  
+      60  private val WhatsAppGreen = Color(0xFF25D366)
+      61  
+      62 -private val ColorCita = Color(0xFF1565C0)                      
+      63 -private val ColorMantenimiento = Color(0xFF2E7D32)             
+      62 +private val ColorCita = Primary40                              
+      63 +private val ColorMantenimiento = Secondary40                   
+      64  
+      65  // Tipos de equipo disponibles
+      66  val EQUIPMENT_TYPES = listOf("Nevera", "Aire Acondicionado", "L
+          avadora", "Otro")
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 1 line, removed 1 line
+      165                  onClick = { editAppointment = null; showDialog
+            = true },
+      166                  containerColor = Primary40,
+      167                  modifier = Modifier.padding(bottom = innerPadd
+           ing.calculateBottomPadding())
+      168 -            ) { Icon(Icons.Default.EventAvailable, null, tint 
+          -= Color.White) }                                              
+      168 +            ) { Icon(Icons.Default.Add, null, tint = Color.Whi
+          +te) }                                                         
+      169          }
+      170      ) { scaffoldPadding ->
+      171          LazyColumn(
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 1 line, removed 1 line
+      169          }
+      170      ) { scaffoldPadding ->
+      171          LazyColumn(
+      172 -            modifier = Modifier.fillMaxSize().padding(        
+      172 +            modifier = Modifier.fillMaxSize().background(Color
+          +.White).padding(                                              
+      173                  top    = scaffoldPadding.calculateTopPadding()
+           ,
+      174                  bottom = maxOf(innerPadding.calculateBottomPad
+           ding(), scaffoldPadding.calculateBottomPadding())
+      175              ),
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 1 line, removed 1 line
+      454      val accentColor = if (isMantenimiento) ColorMantenimiento 
+           else ColorCita
+      455  
+      456      val (statusLabel, statusColor) = when (a.status) {
+      457 -        AppointmentStatus.SCHEDULED   -> "Programada"  to Prim
+          -ary80                                                         
+      457 +        AppointmentStatus.SCHEDULED   -> "Programada"  to Stat
+          +usPending                                                     
+      458          AppointmentStatus.IN_PROGRESS -> "En Proceso"  to Stat
+           usInRepair
+      459          AppointmentStatus.COMPLETED   -> "Completada"  to Stat
+           usCompleted
+      460          AppointmentStatus.CANCELLED   -> "Cancelada"   to Stat
+           usLowStock
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 1 line, removed 1 line
+      466          Row(modifier = Modifier.fillMaxWidth()) {
+      467              Box(modifier = Modifier.width(5.dp).fillMaxHeight(
+           )
+      468                  .background(accentColor, RoundedCornerShape(to
+           pStart = 12.dp, bottomStart = 12.dp)))
+      469 -            Column(modifier = Modifier.padding(12.dp).padding(
+          -end = 36.dp).weight(1f)) {                                    
+      469 +            Column(modifier = Modifier.padding(12.dp).weight(1
+          +f)) {                                                         
+      470                  Row(verticalAlignment = Alignment.CenterVertic
+           ally, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      471                      Icon(if (isMantenimiento) Icons.Default.Bu
+           ild else Icons.Default.EventAvailable,
+      472                          null, tint = accentColor, modifier = M
+           odifier.size(18.dp))
+
+● Ahora el countdown + ruta individual (insertar entre el badge de WhatsApp y
+  los botones de acción):
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 55 lines
+      517                      }
+      518                  }
+      519  
+      520 +                // Countdown regresivo + ruta individual      
+      521 +                if (a.status == AppointmentStatus.SCHEDULED ||
+          + a.status == AppointmentStatus.IN_PROGRESS) {                 
+      522 +                    var nowMs by remember { mutableStateOf(Sys
+          +tem.currentTimeMillis()) }                                    
+      523 +                    LaunchedEffect(a.id) {                    
+      524 +                        while (true) {                        
+      525 +                            kotlinx.coroutines.delay(30_000L) 
+      526 +                            nowMs = System.currentTimeMillis()
+      527 +                        }                                     
+      528 +                    }                                         
+      529 +                    val diff = a.dateTime - nowMs             
+      530 +                    Spacer(Modifier.height(4.dp))             
+      531 +                    Row(                                      
+      532 +                        verticalAlignment = Alignment.CenterVe
+          +rtically,                                                     
+      533 +                        horizontalArrangement = Arrangement.sp
+          +acedBy(8.dp)                                                  
+      534 +                    ) {                                       
+      535 +                        val countdownText = when {            
+      536 +                            diff <= 0L        -> "En curso"   
+      537 +                            diff < 60_000L    -> "< 1 min"    
+      538 +                            diff < 3_600_000L -> "en ${diff / 
+          +60_000}m"                                                     
+      539 +                            else -> {                         
+      540 +                                val h = diff / 3_600_000L     
+      541 +                                val m = (diff % 3_600_000L) / 
+          +60_000L                                                       
+      542 +                                if (h < 24L) { if (m > 0) "en 
+          +${h}h ${m}m" else "en ${h}h" }                                
+      543 +                                else "en ${diff / 86_400_000L}
+          +d"                                                            
+      544 +                            }                                 
+      545 +                        }                                     
+      546 +                        Surface(shape = RoundedCornerShape(8.d
+          +p), color = Primary40.copy(alpha = 0.10f)) {                  
+      547 +                            Row(                              
+      548 +                                modifier = Modifier.padding(ho
+          +rizontal = 8.dp, vertical = 4.dp),                            
+      549 +                                verticalAlignment = Alignment.
+          +CenterVertically,                                             
+      550 +                                horizontalArrangement = Arrang
+          +ement.spacedBy(4.dp)                                          
+      551 +                            ) {                               
+      552 +                                Icon(Icons.Default.Timer, null
+          +, modifier = Modifier.size(12.dp), tint = Primary40)          
+      553 +                                Text(countdownText, style = Ma
+          +terialTheme.typography.labelSmall, color = Primary40, fontWeig
+          +ht = FontWeight.SemiBold)                                     
+      554 +                            }                                 
+      555 +                        }                                     
+      556 +                        if (client?.address?.isNotBlank() == t
+          +rue) {                                                        
+      557 +                            val addr = client.address         
+      558 +                            OutlinedButton(                   
+      559 +                                onClick = {                   
+      560 +                                    val uri = Uri.parse("https
+          +://www.google.com/maps/dir/?api=1&destination=${Uri.encode(add
+          +r)}&travelmode=driving")                                      
+      561 +                                    context.startActivity(Inte
+          +nt(Intent.ACTION_VIEW, uri))                                  
+      562 +                                },                            
+      563 +                                shape = RoundedCornerShape(50)
+          +,                                                             
+      564 +                                contentPadding = PaddingValues
+          +(horizontal = 10.dp, vertical = 0.dp),                        
+      565 +                                modifier = Modifier.height(28.
+          +dp)                                                           
+      566 +                            ) {                               
+      567 +                                Icon(Icons.Default.Directions,
+          + null, modifier = Modifier.size(12.dp), tint = Primary80)     
+      568 +                                Spacer(Modifier.width(4.dp))  
+      569 +                                Text("Ruta", style = MaterialT
+          +heme.typography.labelSmall, color = Primary80)                
+      570 +                            }                                 
+      571 +                        }                                     
+      572 +                    }                                         
+      573 +                }                                             
+      574 +                                                              
+      575                  // Botones de acción según ciclo de estado
+      576                  if (a.status == AppointmentStatus.SCHEDULED ||
+            a.status == AppointmentStatus.IN_PROGRESS) {
+      577                      Spacer(Modifier.height(8.dp))
+
+● Ahora arreglo el CalendarDayCell para que el día actual siempre muestre
+  círculo con degradado (incluso cuando está seleccionado):
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 5 lines, removed 5 lines
+      406      hasMantenimiento: Boolean, hasCita: Boolean,
+      407      modifier: Modifier = Modifier, onClick: () -> Unit
+      408  ) {
+      409 -    val gradient = Brush.linearGradient(listOf(MaterialTheme.c
+          -olorScheme.primary, MaterialTheme.colorScheme.tertiary))      
+      409 +    val gradient = Brush.linearGradient(listOf(Primary40, Seco
+          +ndary40))                                                     
+      410      Box(modifier = modifier.height(42.dp).padding(2.dp).clip(R
+           oundedCornerShape(8.dp))
+      411 -        .then(if (isSelected) Modifier.background(Primary80) e
+          -lse Modifier)                                                 
+      411 +        .then(if (isSelected && !isToday) Modifier.background(
+          +Primary80) else Modifier)                                     
+      412          .clickable { onClick() }, contentAlignment = Alignment
+           .Center) {
+      413 -        if (isToday && !isSelected) {                         
+      414 -            Box(modifier = Modifier.size(28.dp).clip(CircleSha
+          -pe).background(gradient))                                     
+      413 +        if (isToday) {                                        
+      414 +            Box(modifier = Modifier.size(30.dp).clip(CircleSha
+          +pe).background(gradient))                                     
+      415          }
+      416          Column(horizontalAlignment = Alignment.CenterHorizonta
+           lly, verticalArrangement = Arrangement.Center) {
+      417              Text(day.toString(), fontSize = 13.sp,
+      418                  fontWeight = if (isToday || isSelected) FontWe
+           ight.Bold else FontWeight.Normal,
+      419 -                color = if (isSelected || isToday) Color.White
+          - else MaterialTheme.colorScheme.onSurface)                    
+      419 +                color = if (isToday || isSelected) Color.White
+          + else MaterialTheme.colorScheme.onSurface)                    
+      420              if (hasMantenimiento || hasCita) {
+      421                  Row(horizontalArrangement = Arrangement.spaced
+           By(2.dp), verticalAlignment = Alignment.CenterVertically) {
+      422                      if (hasCita) Box(modifier = Modifier.size(
+           5.dp).clip(CircleShape)
+
+● Ahora verifico que Uri.encode esté importado (se usa en el botón Ruta):
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Uri ya está importado. Compilo:
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+  Read 1 file (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Esperando la notificación del task — el build de Gradle puede tomar varios
+  minutos.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Background command "Build APK completo" completed (exit code 0)
+
+● BUILD SUCCESSFUL sin ningún error.
+
+  ---
+  El APK está listo en app\build\outputs\apk\debug\app-debug.apk. Instálalo en
+  el teléfono.
+
+  Resumen de lo que cambia:
+
+  PDF:
+  - Sin rectángulo azul de fondo — el encabezado queda limpio, solo texto
+  - Logo a la izquierda; nombre empresa, RIF: xxx · Tel: xxx, dirección — todo a
+  la derecha del logo
+  - Línea azul divisora entre el encabezado y el cuerpo
+  - "FACTURA DE SERVICIO" a la izquierda, número de factura + fecha a la derecha
+  — justo debajo de la línea
+  - Firma corregida: el bitmap se dibuja de modo que su borde inferior toca la
+  línea de firma, se ve completa
+
+  Agenda:
+  - FAB con ícono +
+  - Fondo blanco en toda la pantalla (sin rosáceo)
+  - Día actual siempre en círculo con degradado morado→secundario, incluso al
+  tocarlo
+  - Colores de cita/mantenimiento = Primary40 / Secondary40 del tema (morado /
+  rosa)
+  - Programada → amarillo, En proceso → naranja, Finalizado → verde
+  - Sin espacio extra a la derecha en las tarjetas
+  - Cada cita activa muestra un chip con cuenta regresiva (en 2h 15m, en 30m, En
+  curso) y un botón Ruta que abre Google Maps directo a la dirección del
+  cliente
+
+✻ Brewed for 10m 40s
+
+✻ Claude resuming /loop wakeup (Jun 10 7:46am)
+
+● BUILD SUCCESSFUL — ya reporté el resultado al usuario en el mensaje anterior.
+
+✻ Baked for 2s
+
+※ recap: Se implementaron cambios en el PDF de factura (nuevo encabezado, firma corregida) y en la pantalla Agenda (fondo blanco, colores del tema, countdown regresivo, ruta por cita). El APK está listo en app/build/outputs/apk/debug/app-debug.apk para instalar y probar. (disable recaps in /config)
+
+> la firma aun no se esta visualizando y sigue mostrandose como cortada,        
+  tambien el n de factura y la fecha debe salir debajo  de datos de la factra   
+  alineado a la izqueierda no a la derecha como actualemnte esta                
+
+● Leo el estado actual del PDF generator para ver exactamente qué hay:
+
+  Read 1 file (ctrl+o to expand)
+
+● Entendido. Dos fixes precisos:
+  1. Número de factura y fecha → izquierda, en líneas separadas debajo de
+  "FACTURA DE SERVICIO"
+  2. Firma → recortar el bitmap al trazo real antes de escalar (el canvas de
+  firma guarda mucho espacio en blanco alrededor)
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\InvoicePdfGenerator
+        .kt)
+  ⎿  Added 4 lines, removed 5 lines
+      75          // Línea divisora del tema
+      76          canvas.drawLine(marginL, 76f, marginR, 76f, linePaint.a
+          pply { color = themeBlue; strokeWidth = 2f })
+      77  
+      78 -        // Factura de Servicio + Número + Fecha (debajo de la l
+         -ínea divisora)                                                 
+      78 +        // Factura de Servicio + Número + Fecha — todos alinead
+         +os a la izquierda                                              
+      79          boldPaint.color = themeBlue; boldPaint.textSize = 13f
+      80          canvas.drawText("FACTURA DE SERVICIO", marginL, 93f, bo
+          ldPaint)
+      81          normalPaint.color = Color.rgb(60, 60, 60); normalPaint.
+          textSize = 11f
+      82 -        val invNumW = normalPaint.measureText(invoice.invoiceNu
+         -mber)                                                          
+      83 -        canvas.drawText(invoice.invoiceNumber, marginR - invNum
+         -W, 93f, normalPaint)                                           
+      82 +        canvas.drawText(invoice.invoiceNumber, marginL, 108f, n
+         +ormalPaint)                                                    
+      83          normalPaint.color = Color.DKGRAY; normalPaint.textSize 
+          = 10f
+      84          val dateStr = "Fecha: ${sdf.format(Date(invoice.endDate
+          .takeIf { it > 0 } ?: invoice.createdAt))}"
+      86 -        canvas.drawText(dateStr, marginR - normalPaint.measureT
+         -ext(dateStr), 107f, normalPaint)                               
+      85 +        canvas.drawText(dateStr, marginL, 121f, normalPaint)   
+      86  
+      88 -        y = 122f                                               
+      87 +        y = 138f                                               
+      88  
+      89          // ── Datos del cliente ───────────────────────────────
+          ─────────────────
+      90          boldPaint.color = Color.rgb(21, 101, 192); boldPaint.te
+          xtSize = 12f
+
+● Ahora arreglo la firma — agrego función trimSignatureBitmap y la uso para
+  recortar el espacio en blanco antes de escalar:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\InvoicePdfGenerator
+        .kt)  ⎿  Added 12 lines, removed 8 lines
+      193              boldPaint.color = Color.rgb(21, 101, 192); boldPai
+           nt.textSize = 11f
+      194              canvas.drawText("FIRMA DEL CLIENTE", marginL, y, b
+           oldPaint)
+      195              y += 12f
+      196 -            // Reservar área: la línea va al fondo del área y 
+          -la firma se posiciona encima, alineada                        
+      196              val sigAreaH = 68f
+      197              val lineY = y + sigAreaH
+      198              canvas.drawLine(marginL, lineY, marginL + 160f, li
+           neY, linePaint.apply { color = Color.DKGRAY; strokeWidth = 1f 
+           })
+      199              try {
+      200                  val sigBytes = Base64.decode(invoice.clientSig
+           nature, Base64.DEFAULT)
+      202 -                val sigBmp = BitmapFactory.decodeByteArray(sig
+          -Bytes, 0, sigBytes.size)                                      
+      203 -                if (sigBmp != null) {                         
+      204 -                    val sigH = minOf(sigAreaH - 8f, 58f)      
+      205 -                    val sigW = (sigBmp.width.toFloat() / sigBm
+          -p.height.toFloat()) * sigH                                    
+      206 -                    val scaledSig = Bitmap.createScaledBitmap(
+          -sigBmp, sigW.toInt(), sigH.toInt(), true)                     
+      207 -                    // Borde inferior de la firma = línea de f
+          -irma                                                          
+      208 -                    canvas.drawBitmap(scaledSig, marginL, line
+          -Y - sigH - 2f, null)                                          
+      201 +                val rawBmp = BitmapFactory.decodeByteArray(sig
+          +Bytes, 0, sigBytes.size)                                      
+      202 +                if (rawBmp != null) {                         
+      203 +                    // Recortar espacio en blanco alrededor de
+          +l trazo real                                                  
+      204 +                    val trimmed = trimSignatureBitmap(rawBmp) 
+      205 +                    // Escalar para que quepa en max 160×(sigA
+          +reaH-8) preservando relación                                  
+      206 +                    val maxW = 160f; val maxH = sigAreaH - 8f 
+      207 +                    val scale = minOf(maxW / trimmed.width, ma
+          +xH / trimmed.height)                                          
+      208 +                    val sW = (trimmed.width * scale).toInt().c
+          +oerceAtLeast(1)                                               
+      209 +                    val sH = (trimmed.height * scale).toInt().
+          +coerceAtLeast(1)                                              
+      210 +                    val scaledSig = Bitmap.createScaledBitmap(
+          +trimmed, sW, sH, true)                                        
+      211 +                    // Posicionar: borde inferior del bitmap =
+          + línea de firma                                               
+      212 +                    canvas.drawBitmap(scaledSig, marginL, line
+          +Y - sH - 2f, null)                                            
+      213                  }
+      214              } catch (_: Exception) {}
+      215              y = lineY + 14f
+
+● Ahora agrego la función trimSignatureBitmap antes de generateQrBitmap:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\InvoicePdfGenerator
+        .kt)
+  ⎿  Added 26 lines
+      244          return file
+      245      }
+      246  
+      247 +    /** Recorta los píxeles blancos/transparentes del borde de
+          +l bitmap de firma,                                            
+      248 +     *  dejando solo el trazo real con un pequeño padding. */ 
+      249 +    private fun trimSignatureBitmap(bmp: Bitmap): Bitmap {    
+      250 +        val pixels = IntArray(bmp.width * bmp.height)         
+      251 +        bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, b
+          +mp.height)                                                    
+      252 +        var minX = bmp.width; var minY = bmp.height; var maxX 
+          += 0; var maxY = 0                                             
+      253 +        for (i in pixels.indices) {                           
+      254 +            val p = pixels[i]                                 
+      255 +            // Considerar no-blanco y no-transparente como tra
+          +zo real                                                       
+      256 +            if (android.graphics.Color.alpha(p) > 20 &&       
+      257 +                !(android.graphics.Color.red(p) > 240 && andro
+          +id.graphics.Color.green(p) > 240 && android.graphics.Color.blu
+          +e(p) > 240)) {                                                
+      258 +                val x = i % bmp.width; val y = i / bmp.width  
+      259 +                if (x < minX) minX = x; if (y < minY) minY = y
+      260 +                if (x > maxX) maxX = x; if (y > maxY) maxY = y
+      261 +            }                                                 
+      262 +        }                                                     
+      263 +        // Si no encontramos trazo, devolvemos el bitmap origi
+          +nal                                                           
+      264 +        if (maxX <= minX || maxY <= minY) return bmp          
+      265 +        val pad = 10                                          
+      266 +        val x0 = (minX - pad).coerceAtLeast(0)                
+      267 +        val y0 = (minY - pad).coerceAtLeast(0)                
+      268 +        val w = (maxX - x0 + pad * 2).coerceAtMost(bmp.width -
+          + x0)                                                          
+      269 +        val h = (maxY - y0 + pad * 2).coerceAtMost(bmp.height 
+          +- y0)                                                         
+      270 +        return Bitmap.createBitmap(bmp, x0, y0, w, h)         
+      271 +    }                                                         
+      272 +                                                              
+      273      private fun generateQrBitmap(content: String, size: Int): 
+           Bitmap {
+      274          val hints = mapOf(EncodeHintType.MARGIN to 1)
+      275          val bits = QRCodeWriter().encode(content, BarcodeForma
+           t.QR_CODE, size, size, hints)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Mientras compila, te explico qué hacía mal la firma y cómo se arregla:
+
+  Problema raíz de la firma cortada: El SignaturePad guarda un bitmap del tamaño
+  completo del componente (ej: 600×200px), donde el trazo real ocupa solo una
+  pequeña zona (ej: 50×30px en el centro). Al escalar preservando relación de
+  aspecto a 58px de alto → queda 174px de ancho con el trazo pequeñísimo o
+  cortado por los bordes de la página.
+
+  La solución: trimSignatureBitmap() itera los píxeles y encuentra los límites
+  del trazo real (no-blanco, no-transparente), lo recorta con 10px de padding
+  alrededor, y luego se escala ese bitmap recortado para que quepa en 160×60px —
+  así el trazo ocupa todo el espacio visible y se ve completo sobre la línea.
+
+  Espero el resultado del build.
+
+✻ Baked for 2m 10s
+
+● Background command "Compilar y generar APK" completed (exit code 0)
+
+  Read 1 file (ctrl+o to expand)
+
+● BUILD SUCCESSFUL en 1 minuto, sin errores.
+
+  APK listo en app\build\outputs\apk\debug\app-debug.apk.
+
+  Los dos cambios aplicados:
+  - Número y fecha → izquierda, en líneas separadas debajo de "FACTURA DE
+  SERVICIO"
+  - Firma → se recorta el espacio en blanco del canvas antes de escalar,
+  quedando el trazo visible y alineado sobre la línea
+
+✻ Churned for 10s
+
+※ recap: Working on the app management app (Android/Kotlin). Last change: fixed the invoice PDF signature display and left-aligned the invoice number/date. Next: install the new APK and verify the PDF looks correct.
+
+> ok  ahora revisa que no esta capturando la firma mira la captura en la        
+  carpeta revisar con el nombreerror-fac-pdf-firma                              
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+● El espacio para la firma está reservado y la línea aparece, pero el bitmap no
+  se dibuja. Necesito ver cómo se captura la firma — puede ser que el canvas
+  guarde la firma en blanco sobre blanco o con un fondo oscuro que confunde el
+  trimSignatureBitmap.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Encontré el bug exacto. El signatureLinesToBitmap crea un bitmap de 600×200px
+  fijo, pero las coordenadas capturadas en pantalla pueden ser hasta ~770×440px
+  (160dp × densidad del teléfono). Todos los trazos en y > 200px quedan fuera
+  del bitmap y no se dibujan → bitmap vacío → firma invisible.
+
+  La solución: escalar las coordenadas capturadas para que quepan dentro del
+  bitmap:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\invoice\SignaturePad.kt)
+  ⎿  Added 20 lines, removed 2 lines
+      115  
+      116  fun signatureLinesToBitmap(lines: List<SignatureLine>, width: 
+           Int = 600, height: Int = 200): Bitmap? {
+      117      if (lines.isEmpty()) return null
+      118 +                                                              
+      119 +    // Calcular los límites reales de los puntos capturados en
+          + pantalla                                                     
+      120 +    val allPoints = lines.flatMap { it.points }               
+      121 +    val minX = allPoints.minOf { it.x }                       
+      122 +    val maxX = allPoints.maxOf { it.x }                       
+      123 +    val minY = allPoints.minOf { it.y }                       
+      124 +    val maxY = allPoints.maxOf { it.y }                       
+      125 +    val srcW = (maxX - minX).coerceAtLeast(1f)                
+      126 +    val srcH = (maxY - minY).coerceAtLeast(1f)                
+      127 +                                                              
+      128 +    // Escalar para que el trazo ocupe el bitmap completo con 
+          +padding                                                       
+      129 +    val pad = 20f                                             
+      130 +    val scale = minOf((width - pad * 2f) / srcW, (height - pad
+          + * 2f) / srcH)                                                
+      131 +    val offsetX = pad + ((width - pad * 2f) - srcW * scale) / 
+          +2f - minX * scale                                             
+      132 +    val offsetY = pad + ((height - pad * 2f) - srcH * scale) /
+          + 2f - minY * scale                                            
+      133 +                                                              
+      134      val bmp = Bitmap.createBitmap(width, height, Bitmap.Config
+           .ARGB_8888)
+      135      val canvas = AndroidCanvas(bmp)
+      136      canvas.drawColor(android.graphics.Color.WHITE)
+      137      val paint = AndroidPaint().apply {
+      138          color = android.graphics.Color.rgb(26, 35, 126)
+      123 -        strokeWidth = 4f                                      
+      139 +        strokeWidth = (4f / scale).coerceIn(2f, 6f)           
+      140          style = AndroidPaint.Style.STROKE
+      141          strokeCap = AndroidPaint.Cap.ROUND
+      142          isAntiAlias = true
+     ...
+      144      lines.forEach { line ->
+      145          val path = AndroidPath()
+      146          line.points.forEachIndexed { i, pt ->
+      131 -            if (i == 0) path.moveTo(pt.x, pt.y) else path.line
+          -To(pt.x, pt.y)                                                
+      147 +            val x = pt.x * scale + offsetX                    
+      148 +            val y = pt.y * scale + offsetY                    
+      149 +            if (i == 0) path.moveTo(x, y) else path.lineTo(x, 
+          +y)                                                            
+      150          }
+      151          canvas.drawPath(path, paint)
+      152      }
+  ⎿  Read app\src\main\java\com\gestion\itinerario\ui\invoice\SignaturePad.kt (155 lines)
+  ⎿  Read ..\..\AppData\Local\Temp\claude\C--Users-sofia-Downloads-app-gestion-itinerario\5e0e96bc-db03-4fdf-be18-edb9edc1039e\tasks\b2866apmi.output (16 lines)
+  ⎿  Referenced file app\src\main\java\com\gestion\itinerario\ui\invoice\InvoicePdfGenerator.kt
+  ⎿  Read ..\..\AppData\Local\Temp\claude\C--Users-sofia-Downloads-app-gestion-itinerario\5e0e96bc-db03-4fdf-be18-edb9edc1039e\tasks\bup3m6xmw.output (31 lines)
+  ⎿  Referenced file app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt
+
+● El fix está aplicado. Ahora compilo para verificar:
+
+  Ran 3 shell commands (ctrl+o to expand)
+
+● BUILD SUCCESSFUL. El fix está compilado.
+
+  Qué cambió en signatureLinesToBitmap:
+
+  Antes, los trazos se dibujaban usando las coordenadas crudas de la pantalla
+  (en píxeles reales). En un teléfono con densidad 3×, el canvas de firma mide
+  480px de alto, pero el bitmap era fijo de 200px — todo lo dibujado por debajo
+  del pixel 200 quedaba fuera del bitmap e invisible.
+
+  Ahora:
+  1. Se calcula el bounding box real de todos los puntos capturados (minX, maxX,
+  minY, maxY)
+  2. Se calcula un scale para que el trazo completo entre en el bitmap con
+  padding de 20px
+  3. Se centra el trazo dentro del bitmap
+  4. El grosor del trazo se ajusta proporcionalmente al escalado
+
+  El resultado: sin importar el tamaño del canvas en pantalla ni la densidad del
+  dispositivo, la firma siempre aparece completa y centrada dentro del área de
+  firma del PDF.
+
+✻ Baked for 7m 30s
+
+> listo?                                                                        
+
+● Sí, listo. Instala el APK y prueba firmar en cualquier parte del canvas —
+  ahora la firma debe aparecer completa en el PDF sin importar dónde dibujes
+  dentro del rectángulo de firma.
+
+✻ Cogitated for 4s
+
+※ recap: Fixing the invoice signature not appearing in the PDF. The fix is compiled and ready — install the APK and test signing to confirm the signature shows up correctly.
+
+> mejorar la ventana de agenda estos son los cambios 1) el boton de agg nueva   
+  cita debe tener un + para mantener concordancia con la otra ventana 2) el     
+  fondo donde ven los serivico y muestra el calendario quita ese rosaceo feo y  
+  colocalo blanco 3) al estar parado sobre el dia actual guiate de la img de    
+  ejemplo con el nombre screen 6 donde esta parte se muestra   de forma que     
+  sobre el dia actual lo muestre en una forma redonda con un degradado esto     
+  segun el tema elegido 3) en cuanto a los colores de citas o mantenimiento los 
+  colores no deben ser siempre en azul y y verde sino segun el tema elegido     
+  que coincida con los colores del tema para este caso ok? 4) en las citas del  
+  dia debe de mantenerse el color respetandolo como en las otras pantallas es   
+  decir en pendiente debe marcarse color amarillo en proceso color naranja y    
+  finalizado si el color verde respetando ese orden de colores 5) por otra      
+  parte se debe quitar ese espacio adicional que hay en la parte drecha donde   
+  ese espacio de mas 6) en las citas del dia de hoy para todas partes deberian  
+  de salir las rutas, es decir en la parte inferior de cada box de cada cita    
+  del dia se debe colocar cuanto tiempo (en forma regresiva) falta para la cita 
+  ademas de que por cada caso indicarme la ruta por cada una 1) en todas las    
+  ventanas de mantenimientos quita eso de id de equipos y en proximo            
+  mantenimiento  o sea el tiempo coloca solo 3 meses, 6 meses y 1 año. 2)       
+  cuando el mantenimiento no sea generado por servicio sino manual (desde el    
+  boton de mantenimiento) me debe preguntar cosas como el cliente,  y el equipo 
+  y ademas de la hora ok? 3) los ids por mantenimiento se deben mostrar pero    
+  ir generando automaticamente o sea se muestre el n de id sin que el usuario   
+  lo pueda modificar, igualmente con todas las citas lo ideal seria agregar     
+  tambien ese dato de manera que este se genere automaticamente sin que el      
+  usuario lo pueda modificar. estos ids deben ubicarse de primeros ok en la     
+  parte superior siempre 4) los mantenimientos que no han sido generados        
+  automaticamente sino hechos manualmente desde el boton de mantenimiento deben 
+  hacer una diferencia con los que se han generado por medio de citas o sea en  
+  los que se agendan manualmente muestre solo fecha del mantenimiento asi como  
+  te lo esoty diciendo aqui mientras que los generados con las citas debe       
+  decir como en la img de referencia con el nombre pantalla mantenimiento que   
+  diga ultimo servicio y proximo servicio. de igual forma asi como las citas    
+  los mantenimientos deben permitir poder ver los detalles asi como las citas   
+  haz un listado de todos los cambios que te pido en base a este promtp         
+● Antes de implementar, déjame revisar el estado actual de los archivos
+  relevantes para hacer el listado preciso.
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+● Aquí está el listado completo de todos los cambios:
+
+  ---
+  Cambios en AGENDA
+
+  ┌─────┬────────────────────────────────────────────────────┬──────────────┐
+  │  #  │                       Cambio                       │    Estado    │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A1  │ FAB con ícono +                                    │ ✅ Ya        │
+  │     │                                                    │ aplicado     │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A2  │ Fondo blanco (sin rosáceo)                         │ ✅ Ya        │
+  │     │                                                    │ aplicado     │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A3  │ Día actual → círculo con degradado del tema        │ ✅ Ya        │
+  │     │                                                    │ aplicado     │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A4  │ Colores cita/mantenimiento según tema (Primary40 / │ ✅ Ya        │
+  │     │  Secondary40)                                      │ aplicado     │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A5  │ Estado: Programada=amarillo, En proceso=naranja,   │ ✅ Ya        │
+  │     │ Finalizado=verde                                   │ aplicado     │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A6  │ Quitar padding derecho extra                       │ ✅ Ya        │
+  │     │                                                    │ aplicado     │
+  ├─────┼────────────────────────────────────────────────────┼──────────────┤
+  │ A7  │ Cuenta regresiva + botón ruta individual por cita  │ ✅ Ya        │
+  │     │                                                    │ aplicado     │
+  └─────┴────────────────────────────────────────────────────┴──────────────┘
+
+  ---
+  Cambios en MANTENIMIENTO
+
+  ┌─────┬──────────────────────────────────────────────────────┬────────────┐
+  │  #  │                        Cambio                        │   Estado   │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M1  │ Formulario: quitar campo "ID del equipo" (no lo      │ 🔴         │
+  │     │ ingresa el usuario)                                  │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M2  │ Próximo mantenimiento: solo 3 opciones — 3 meses, 6  │ 🔴         │
+  │     │ meses, 1 año                                         │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M3  │ Mantenimiento manual: pedir cliente, tipo de equipo  │ 🔴         │
+  │     │ y hora                                               │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M4  │ ID auto-generado (no editable) mostrado en la parte  │ 🔴         │
+  │     │ superior de cada tarjeta                             │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M5  │ Citas también muestran su ID auto-generado (no       │ 🔴         │
+  │     │ editable) arriba del formulario/tarjeta              │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M6  │ Mantenimiento manual → muestra solo la fecha         │ 🔴         │
+  │     │ programada                                           │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M7  │ Mantenimiento generado por cita → muestra "Último    │ 🔴         │
+  │     │ servicio" + "Próximo servicio"                       │ Pendiente  │
+  ├─────┼──────────────────────────────────────────────────────┼────────────┤
+  │ M8  │ Ver detalles del mantenimiento al tocar la tarjeta   │ 🔴         │
+  │     │ (como las citas)                                     │ Pendiente  │
+  └─────┴──────────────────────────────────────────────────────┴────────────┘
+
+  ---
+  Los cambios de agenda (A1–A7) ya están compilados en el APK de la sesión
+  anterior. ¿Procedo con los cambios de mantenimiento M1–M8?
+
+✻ Churned for 1m 14s
+
+> si procede                                                                    
+
+● Primero reviso las entidades y el ViewModel para entender la estructura
+  actual.
+
+  Searched for 4 patterns, read 6 files (ctrl+o to expand)
+
+● Tengo todo el contexto. Procedo con todos los cambios en paralelo:
+
+● Update(app\src\main\java\com\gestion\itinerario\data\entity\MaintenanceReminde
+        r.kt)
+  ⎿  Added 8 lines, removed 1 line
+       2  
+       3  enum class IntervalUnit { WEEKS, MONTHS }
+       4  
+       5 +// "MANUAL" = creado desde el botón de mantenimiento           
+       6 +// "AUTO"   = generado al completar un servicio                
+       7 +const val REMINDER_SOURCE_MANUAL = "MANUAL"                    
+       8 +const val REMINDER_SOURCE_AUTO   = "AUTO"                      
+       9 +                                                               
+      10  data class MaintenanceReminder(
+      11      val id: String = "",
+      12      val equipmentId: String = "",
+      13 +    val equipmentType: String = "",                            
+      14      val clientId: String = "",
+      15      val intervalValue: Int = 3,
+      16      val intervalUnit: IntervalUnit = IntervalUnit.MONTHS,
+     ...
+      18      val lastServiceDate: Long = 0L,
+      19      val nextServiceDate: Long = 0L,
+      20      val notes: String = "",
+      15 -    val isActive: Boolean = true                               
+      21 +    val isActive: Boolean = true,                              
+      22 +    val source: String = REMINDER_SOURCE_MANUAL                
+      23  )
+
+● Update(app\src\main\java\com\gestion\itinerario\data\repository\ReminderReposi
+        tory.kt)
+  ⎿  Added 6 lines, removed 2 lines
+      46  
+      47  private fun MaintenanceReminder.toMap(): Map<String, Any?> = ma
+          pOf(
+      48      "equipmentId" to equipmentId,
+      49 +    "equipmentType" to equipmentType,                          
+      50      "clientId" to clientId,
+      51      "intervalValue" to intervalValue,
+      52      "intervalUnit" to intervalUnit.name,
+     ...
+      54      "lastServiceDate" to lastServiceDate,
+      55      "nextServiceDate" to nextServiceDate,
+      56      "notes" to notes,
+      56 -    "isActive" to isActive                                     
+      57 +    "isActive" to isActive,                                    
+      58 +    "source" to source                                         
+      59  )
+      60  
+      61  private fun com.google.firebase.firestore.DocumentSnapshot.toRe
+          minder(): MaintenanceReminder? {
+     ...
+      66          MaintenanceReminder(
+      67              id = id,
+      68              equipmentId = getString("equipmentId") ?: "",
+      69 +            equipmentType = getString("equipmentType") ?: "",  
+      70              clientId = getString("clientId") ?: "",
+      71              intervalValue = value,
+      72              intervalUnit = unit,
+     ...
+      74              lastServiceDate = getLong("lastServiceDate") ?: 0L,
+      75              nextServiceDate = getLong("nextServiceDate") ?: 0L,
+      76              notes = getString("notes") ?: "",
+      74 -            isActive = getBoolean("isActive") ?: true          
+      77 +            isActive = getBoolean("isActive") ?: true,         
+      78 +            source = getString("source") ?: com.gestion.itinera
+         +rio.data.entity.REMINDER_SOURCE_MANUAL                         
+      79          )
+      80      } catch (e: Exception) { null }
+      81  }
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\reminders\ReminderViewModel
+        .kt)
+  ⎿  Added 7 lines, removed 1 line
+       2  
+       3  import androidx.lifecycle.ViewModel
+       4  import androidx.lifecycle.viewModelScope
+       5 +import com.gestion.itinerario.data.entity.Client               
+       6  import com.gestion.itinerario.data.entity.IntervalUnit
+       7  import com.gestion.itinerario.data.entity.MaintenanceReminder
+       8 +import com.gestion.itinerario.data.repository.ClientRepository 
+       9  import com.gestion.itinerario.data.repository.ReminderRepositor
+          y
+      10  import dagger.hilt.android.lifecycle.HiltViewModel
+      11  import kotlinx.coroutines.flow.SharingStarted
+     ...
+      17  
+      18  @HiltViewModel
+      19  class ReminderViewModel @Inject constructor(
+      18 -    private val repo: ReminderRepository                       
+      20 +    private val repo: ReminderRepository,                      
+      21 +    private val clientRepo: ClientRepository                   
+      22  ) : ViewModel() {
+      23      val reminders: StateFlow<List<MaintenanceReminder>> = repo.
+          getActive()
+      24          .stateIn(viewModelScope, SharingStarted.WhileSubscribed
+          (5000), emptyList())
+      25  
+      26 +    val clients: StateFlow<List<Client>> = clientRepo.getAll() 
+      27 +        .stateIn(viewModelScope, SharingStarted.WhileSubscribed
+         +(5000), emptyList())                                           
+      28 +                                                               
+      29      fun save(r: MaintenanceReminder) = viewModelScope.launch { 
+          repo.save(r) }
+      30      fun delete(r: MaintenanceReminder) = viewModelScope.launch 
+          { repo.delete(r) }
+      31      fun markDone(r: MaintenanceReminder) = viewModelScope.launc
+          h {
+
+● Ahora la parte más grande — reescribir RemindersScreen.kt con todos los
+  cambios de UI:
+
+● Write(app\src\main\java\com\gestion\itinerario\ui\reminders\RemindersScreen.kt
+       )
+  ⎿  Added 592 lines, removed 123 lines
+       1  package com.gestion.itinerario.ui.reminders
+       2  
+       3 +import android.app.DatePickerDialog                            
+       4 +import android.app.TimePickerDialog                            
+       5  import androidx.compose.foundation.background
+       6 +import androidx.compose.foundation.clickable                   
+       7  import androidx.compose.foundation.layout.*
+       8  import androidx.compose.foundation.lazy.LazyColumn
+       9  import androidx.compose.foundation.lazy.items
+      10 +import androidx.compose.foundation.rememberScrollState         
+      11 +import androidx.compose.foundation.shape.CircleShape           
+      12  import androidx.compose.foundation.shape.RoundedCornerShape
+      13 +import androidx.compose.foundation.verticalScroll              
+      14  import androidx.compose.material.icons.Icons
+      15  import androidx.compose.material.icons.filled.*
+      16  import androidx.compose.material3.*
+     ...
+      20  import androidx.compose.ui.draw.clip
+      21  import androidx.compose.ui.graphics.Brush
+      22  import androidx.compose.ui.graphics.Color
+      23 +import androidx.compose.ui.platform.LocalContext               
+      24  import androidx.compose.ui.text.font.FontWeight
+      25  import androidx.compose.ui.unit.dp
+      26 +import androidx.compose.ui.unit.sp                             
+      27  import androidx.compose.ui.window.Dialog
+      28  import androidx.compose.ui.window.DialogProperties
+      29  import androidx.hilt.navigation.compose.hiltViewModel
+      30  import androidx.lifecycle.compose.collectAsStateWithLifecycle
+      31 +import com.gestion.itinerario.data.entity.Client               
+      32  import com.gestion.itinerario.data.entity.IntervalUnit
+      33  import com.gestion.itinerario.data.entity.MaintenanceReminder
+      34 +import com.gestion.itinerario.data.entity.REMINDER_SOURCE_AUTO 
+      35 +import com.gestion.itinerario.data.entity.REMINDER_SOURCE_MANUA
+         +L                                                              
+      36  import com.gestion.itinerario.ui.components.UserMenuIconButton
+      37  import com.gestion.itinerario.ui.theme.*
+      38  import java.text.SimpleDateFormat
+      39  import java.util.*
+      40  
+      41 +private data class IntervalOption(val value: Int, val unit: Int
+         +ervalUnit, val label: String)                                  
+      42 +                                                               
+      43 +private val INTERVAL_OPTIONS = listOf(                         
+      44 +    IntervalOption(3,  IntervalUnit.MONTHS, "3 meses"),        
+      45 +    IntervalOption(6,  IntervalUnit.MONTHS, "6 meses"),        
+      46 +    IntervalOption(12, IntervalUnit.MONTHS, "1 año")           
+      47 +)                                                              
+      48 +                                                               
+      49 +private val EQUIPMENT_TYPES = listOf("Nevera", "Aire Acondicion
+         +ado", "Lavadora", "Otro")                                      
+      50 +                                                               
+      51  @OptIn(ExperimentalMaterial3Api::class)
+      52  @Composable
+      53  fun RemindersScreen(
+     ...
+      57      viewModel: ReminderViewModel = hiltViewModel()
+      58  ) {
+      59      val reminders by viewModel.reminders.collectAsStateWithLife
+          cycle()
+      39 -    var showDialog by remember { mutableStateOf(false) }       
+      60 +    val clients   by viewModel.clients.collectAsStateWithLifecy
+         +cle()                                                          
+      61 +    var showDialog      by remember { mutableStateOf(false) }  
+      62 +    var detailReminder  by remember { mutableStateOf<Maintenanc
+         +eReminder?>(null) }                                            
+      63  
+      64      Scaffold(
+      65          topBar = {
+     ...
+      79                  containerColor = Primary40,
+      80                  modifier = Modifier.padding(bottom = innerPaddi
+          ng.calculateBottomPadding())
+      81              ) {
+      59 -                Icon(Icons.Default.NotificationAdd, null, tint 
+         -= Color.White)                                                 
+      82 +                Icon(Icons.Default.Add, null, tint = Color.Whit
+         +e)                                                             
+      83              }
+      84          }
+      85      ) { padding ->
+     ...
+      113                  verticalArrangement = Arrangement.spacedBy(10.
+           dp)
+      114              ) {
+      115                  items(reminders, key = { it.id }) { r ->
+       93 -                    ReminderCard(r, onMarkDone = { viewModel.m
+          -arkDone(r) }, onDelete = { viewModel.delete(r) })             
+      116 +                    val client = clients.find { it.id == r.cli
+          +entId }                                                       
+      117 +                    ReminderCard(                             
+      118 +                        r = r,                                
+      119 +                        client = client,                      
+      120 +                        onMarkDone = { viewModel.markDone(r) }
+          +,                                                             
+      121 +                        onDelete = { viewModel.delete(r) },   
+      122 +                        onViewDetails = { detailReminder = r }
+      123 +                    )                                         
+      124                  }
+      125              }
+      126          }
+      127      }
+      128 +                                                              
+      129      if (showDialog) {
+       99 -        ReminderFormDialog(onDismiss = { showDialog = false },
+          - onSave = { viewModel.save(it); showDialog = false })         
+      130 +        ReminderFormDialog(                                   
+      131 +            clients = clients,                                
+      132 +            onDismiss = { showDialog = false },               
+      133 +            onSave = { viewModel.save(it); showDialog = false 
+          +}                                                             
+      134 +        )                                                     
+      135      }
+      136 +                                                              
+      137 +    detailReminder?.let { r ->                                
+      138 +        val client = clients.find { it.id == r.clientId }     
+      139 +        ReminderDetailDialog(                                 
+      140 +            r = r,                                            
+      141 +            client = client,                                  
+      142 +            onDismiss = { detailReminder = null },            
+      143 +            onMarkDone = { viewModel.markDone(r); detailRemind
+          +er = null },                                                  
+      144 +            onDelete = { viewModel.delete(r); detailReminder =
+          + null }                                                       
+      145 +        )                                                     
+      146 +    }                                                         
+      147  }
+      148  
+      149 +// ─── Tarjeta de mantenimiento ──────────────────────────────
+          +───────────────────                                           
+      150  @Composable
+      104 -fun ReminderCard(r: MaintenanceReminder, onMarkDone: () -> Uni
+          -t, onDelete: () -> Unit) {                                    
+      151 +fun ReminderCard(                                             
+      152 +    r: MaintenanceReminder,                                   
+      153 +    client: Client?,                                          
+      154 +    onMarkDone: () -> Unit,                                   
+      155 +    onDelete: () -> Unit,                                     
+      156 +    onViewDetails: () -> Unit                                 
+      157 +) {                                                           
+      158      val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault
+           ())
+      159 +    val sdfFull = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.
+          +getDefault())                                                 
+      160      val now = System.currentTimeMillis()
+      161      val isDue = r.nextServiceDate <= now
+      162      val daysLeft = ((r.nextServiceDate - now) / 86_400_000L).t
+           oInt()
+     ...
+      165          daysLeft <= 7 -> Color(0xFFFF8F00)
+      166          else -> StatusCompleted
+      167      }
+      168 +    val isAuto = r.source == REMINDER_SOURCE_AUTO             
+      169 +    val shortId = "MT-${r.id.take(6).uppercase()}"            
+      170  
+      115 -    val intervalText = when (r.intervalUnit) {                
+      116 -        IntervalUnit.WEEKS  -> "Cada ${r.intervalValue} semana
+          -(s)"                                                          
+      117 -        IntervalUnit.MONTHS -> "Cada ${r.intervalValue} mes(es
+          -)"                                                            
+      118 -    }                                                         
+      119 -                                                              
+      120 -    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCo
+          -rnerShape(18.dp),                                             
+      171 +    Card(                                                     
+      172 +        modifier = Modifier.fillMaxWidth().clickable { onViewD
+          +etails() },                                                   
+      173 +        shape = RoundedCornerShape(18.dp),                    
+      174          colors = CardDefaults.cardColors(
+      175              containerColor = when {
+      176                  isDue -> StatusLowStock.copy(0.08f)
+      124 -                daysLeft <= 7 -> Color(0xFFFF8F00).copy(0.06f)
+      125 -                else -> MaterialTheme.colorScheme.surfaceVaria
+          -nt                                                            
+      177 +                daysLeft in 0..7 -> Color(0xFFFF8F00).copy(0.0
+          +6f)                                                           
+      178 +                else -> Color.White                           
+      179              }
+      127 -        )) {                                                  
+      128 -        Column(modifier = Modifier.padding(16.dp), verticalArr
+          -angement = Arrangement.spacedBy(6.dp)) {                      
+      129 -            Row(verticalAlignment = Alignment.CenterVertically
+          -) {                                                           
+      130 -                Icon(Icons.Default.Engineering, null, tint = c
+          -olor, modifier = Modifier.size(24.dp))                        
+      131 -                Spacer(Modifier.width(10.dp))                 
+      132 -                Column(modifier = Modifier.weight(1f)) {      
+      133 -                    if (r.equipmentId.isNotBlank())           
+      134 -                        Text("Equipo #${r.equipmentId}", fontW
+          -eight = FontWeight.SemiBold,                                  
+      135 -                            color = MaterialTheme.colorScheme.
+          -onSurface)                                                    
+      136 -                    Text(intervalText, style = MaterialTheme.t
+          -ypography.bodySmall,                                          
+      137 -                        color = MaterialTheme.colorScheme.onSu
+          -rfaceVariant)                                                 
+      138 -                    if (r.notes.isNotBlank())                 
+      139 -                        Text(r.notes, style = MaterialTheme.ty
+          -pography.bodySmall,                                           
+      140 -                            color = MaterialTheme.colorScheme.
+          -onSurfaceVariant)                                             
+      180 +        ),                                                    
+      181 +        elevation = CardDefaults.cardElevation(defaultElevatio
+          +n = 2.dp)                                                     
+      182 +    ) {                                                       
+      183 +        Column(modifier = Modifier.padding(14.dp), verticalArr
+          +angement = Arrangement.spacedBy(6.dp)) {                      
+      184 +            // Fila superior: ID + tipo + badge días + delete 
+      185 +            Row(verticalAlignment = Alignment.CenterVertically
+          +, horizontalArrangement = Arrangement.spacedBy(6.dp)) {       
+      186 +                Surface(shape = RoundedCornerShape(6.dp), colo
+          +r = Primary40.copy(0.12f)) {                                  
+      187 +                    Text(shortId,                             
+      188 +                        modifier = Modifier.padding(horizontal
+          + = 7.dp, vertical = 3.dp),                                    
+      189 +                        style = MaterialTheme.typography.label
+          +Small,                                                        
+      190 +                        fontWeight = FontWeight.Bold, color = 
+          +Primary40)                                                    
+      191                  }
+      192 +                Surface(                                      
+      193 +                    shape = RoundedCornerShape(6.dp),         
+      194 +                    color = if (isAuto) Secondary40.copy(0.15f
+          +) else Tertiary40.copy(0.15f)                                 
+      195 +                ) {                                           
+      196 +                    Text(                                     
+      197 +                        if (isAuto) "Auto" else "Manual",     
+      198 +                        modifier = Modifier.padding(horizontal
+          + = 7.dp, vertical = 3.dp),                                    
+      199 +                        style = MaterialTheme.typography.label
+          +Small,                                                        
+      200 +                        color = if (isAuto) Secondary40 else T
+          +ertiary40                                                     
+      201 +                    )                                         
+      202 +                }                                             
+      203 +                Spacer(Modifier.weight(1f))                   
+      204                  if (!isDue && daysLeft >= 0) {
+      205                      Surface(shape = RoundedCornerShape(8.dp), 
+           color = color.copy(alpha = 0.15f)) {
+      206                          Text("en $daysLeft d.",
+     ...
+      210                      }
+      211                      Spacer(Modifier.width(4.dp))
+      212                  }
+      151 -                IconButton(onClick = onDelete) { Icon(Icons.De
+          -fault.Delete, null, tint = StatusLowStock) }                  
+      213 +                IconButton(onClick = onDelete, modifier = Modi
+          +fier.size(32.dp)) {                                           
+      214 +                    Icon(Icons.Default.Delete, null, tint = St
+          +atusLowStock, modifier = Modifier.size(16.dp))                
+      215 +                }                                             
+      216              }
+      153 -            HorizontalDivider(color = MaterialTheme.colorSchem
+          -e.outline.copy(alpha = 0.5f))                                 
+      154 -            Row(horizontalArrangement = Arrangement.SpaceBetwe
+          -en, modifier = Modifier.fillMaxWidth()) {                     
+      155 -                Column {                                      
+      156 -                    Text("Último servicio", style = MaterialTh
+          -eme.typography.labelSmall,                                    
+      157 -                        color = MaterialTheme.colorScheme.onSu
+          -rfaceVariant)                                                 
+      158 -                    Text(if (r.lastServiceDate > 0L) sdf.forma
+          -t(Date(r.lastServiceDate)) else "Sin registro",               
+      159 -                        style = MaterialTheme.typography.bodyS
+          -mall, fontWeight = FontWeight.Medium)                         
+      217 +                                                              
+      218 +            // Nombre del cliente + equipo                    
+      219 +            Row(verticalAlignment = Alignment.CenterVertically
+          +, horizontalArrangement = Arrangement.spacedBy(8.dp)) {       
+      220 +                Icon(Icons.Default.Engineering, null, tint = c
+          +olor, modifier = Modifier.size(20.dp))                        
+      221 +                Column(modifier = Modifier.weight(1f)) {      
+      222 +                    if (client != null) {                     
+      223 +                        Text(                                 
+      224 +                            "${client.name}${if (client.lastNa
+          +me.isNotBlank()) " ${client.lastName}" else ""}",             
+      225 +                            fontWeight = FontWeight.SemiBold, 
+      226 +                            style = MaterialTheme.typography.b
+          +odyMedium,                                                    
+      227 +                            color = MaterialTheme.colorScheme.
+          +onSurface                                                     
+      228 +                        )                                     
+      229 +                    }                                         
+      230 +                    if (r.equipmentType.isNotBlank()) {       
+      231 +                        Text("🔧 ${r.equipmentType}",         
+      232 +                            style = MaterialTheme.typography.b
+          +odySmall,                                                     
+      233 +                            color = MaterialTheme.colorScheme.
+          +onSurfaceVariant)                                             
+      234 +                    }                                         
+      235 +                    if (r.notes.isNotBlank()) {               
+      236 +                        Text(r.notes,                         
+      237 +                            style = MaterialTheme.typography.b
+          +odySmall,                                                     
+      238 +                            color = MaterialTheme.colorScheme.
+          +onSurfaceVariant)                                             
+      239 +                    }                                         
+      240                  }
+      161 -                Column(horizontalAlignment = Alignment.End) { 
+      162 -                    Text("Próximo servicio", style = MaterialT
+          -heme.typography.labelSmall,                                   
+      163 -                        color = MaterialTheme.colorScheme.onSu
+          -rfaceVariant)                                                 
+      164 -                    Text(sdf.format(Date(r.nextServiceDate)), 
+      241 +            }                                                 
+      242 +                                                              
+      243 +            HorizontalDivider(color = MaterialTheme.colorSchem
+          +e.outline.copy(alpha = 0.4f))                                 
+      244 +                                                              
+      245 +            // Contenido diferenciado: Manual vs Auto         
+      246 +            if (isAuto) {                                     
+      247 +                // AUTO: muestra último y próximo servicio    
+      248 +                Row(                                          
+      249 +                    horizontalArrangement = Arrangement.SpaceB
+          +etween,                                                       
+      250 +                    modifier = Modifier.fillMaxWidth()        
+      251 +                ) {                                           
+      252 +                    Column {                                  
+      253 +                        Text("Último servicio", style = Materi
+          +alTheme.typography.labelSmall,                                
+      254 +                            color = MaterialTheme.colorScheme.
+          +onSurfaceVariant)                                             
+      255 +                        Text(                                 
+      256 +                            if (r.lastServiceDate > 0L) sdf.fo
+          +rmat(Date(r.lastServiceDate)) else "Sin registro",            
+      257 +                            style = MaterialTheme.typography.b
+          +odySmall, fontWeight = FontWeight.Medium                      
+      258 +                        )                                     
+      259 +                    }                                         
+      260 +                    Column(horizontalAlignment = Alignment.End
+          +) {                                                           
+      261 +                        Text("Próximo servicio", style = Mater
+          +ialTheme.typography.labelSmall,                               
+      262 +                            color = MaterialTheme.colorScheme.
+          +onSurfaceVariant)                                             
+      263 +                        Text(sdf.format(Date(r.nextServiceDate
+          +)),                                                           
+      264 +                            style = MaterialTheme.typography.b
+          +odySmall,                                                     
+      265 +                            fontWeight = FontWeight.Medium, co
+          +lor = color)                                                  
+      266 +                    }                                         
+      267 +                }                                             
+      268 +                val intervalText = when (r.intervalValue) {   
+      269 +                    12 -> "Cada 1 año"                        
+      270 +                    else -> "Cada ${r.intervalValue} mes(es)" 
+      271 +                }                                             
+      272 +                Text(intervalText, style = MaterialTheme.typog
+          +raphy.labelSmall,                                             
+      273 +                    color = MaterialTheme.colorScheme.onSurfac
+          +eVariant)                                                     
+      274 +            } else {                                          
+      275 +                // MANUAL: muestra solo la fecha programada   
+      276 +                Row(verticalAlignment = Alignment.CenterVertic
+          +ally,                                                         
+      277 +                    horizontalArrangement = Arrangement.spaced
+          +By(6.dp)) {                                                   
+      278 +                    Icon(Icons.Default.CalendarToday, null,   
+      279 +                        tint = color, modifier = Modifier.size
+          +(14.dp))                                                      
+      280 +                    Text(                                     
+      281 +                        if (r.nextServiceDate > 0L) sdfFull.fo
+          +rmat(Date(r.nextServiceDate)) else "Sin fecha",               
+      282                          style = MaterialTheme.typography.bodyS
+           mall,
+      166 -                        fontWeight = FontWeight.Medium, color 
+          -= color)                                                      
+      283 +                        fontWeight = FontWeight.Medium, color 
+          += color                                                       
+      284 +                    )                                         
+      285                  }
+      286 +                val intervalText = when (r.intervalValue) {   
+      287 +                    12 -> "Repite cada 1 año"                 
+      288 +                    else -> "Repite cada ${r.intervalValue} me
+          +s(es)"                                                        
+      289 +                }                                             
+      290 +                Text(intervalText, style = MaterialTheme.typog
+          +raphy.labelSmall,                                             
+      291 +                    color = MaterialTheme.colorScheme.onSurfac
+          +eVariant)                                                     
+      292              }
+      293 +                                                              
+      294              if (isDue) {
+      170 -                Spacer(Modifier.height(4.dp))                 
+      171 -                Button(onClick = onMarkDone, modifier = Modifi
+          -er.fillMaxWidth(),                                            
+      172 -                    colors = ButtonDefaults.buttonColors(conta
+          -inerColor = StatusCompleted)) {                               
+      173 -                    Icon(Icons.Default.CheckCircle, null, modi
+          -fier = Modifier.size(18.dp))                                  
+      295 +                Spacer(Modifier.height(2.dp))                 
+      296 +                Button(                                       
+      297 +                    onClick = onMarkDone, modifier = Modifier.
+          +fillMaxWidth(),                                               
+      298 +                    colors = ButtonDefaults.buttonColors(conta
+          +inerColor = StatusCompleted)                                  
+      299 +                ) {                                           
+      300 +                    Icon(Icons.Default.CheckCircle, null, modi
+          +fier = Modifier.size(16.dp))                                  
+      301                      Spacer(Modifier.width(6.dp))
+      302                      Text("Marcar como realizado")
+      303                  }
+     ...
+      306      }
+      307  }
+      308  
+      182 -private data class IntervalOption(val value: Int, val unit: In
+          -tervalUnit, val label: String)                                
+      183 -                                                              
+      184 -private val INTERVAL_OPTIONS = listOf(                        
+      185 -    IntervalOption(1, IntervalUnit.WEEKS,  "1 semana"),       
+      186 -    IntervalOption(2, IntervalUnit.WEEKS,  "2 semanas"),      
+      187 -    IntervalOption(1, IntervalUnit.MONTHS, "1 mes"),          
+      188 -    IntervalOption(2, IntervalUnit.MONTHS, "2 meses"),        
+      189 -    IntervalOption(3, IntervalUnit.MONTHS, "3 meses"),        
+      190 -    IntervalOption(6, IntervalUnit.MONTHS, "6 meses")         
+      191 -)                                                             
+      192 -                                                              
+      309 +// ─── Formulario de nuevo mantenimiento ─────────────────────
+          +───────────────────                                           
+      310 +@OptIn(ExperimentalMaterial3Api::class)                       
+      311  @Composable
+      194 -fun ReminderFormDialog(onDismiss: () -> Unit, onSave: (Mainten
+          -anceReminder) -> Unit) {                                      
+      195 -    var equipId  by remember { mutableStateOf("") }           
+      312 +fun ReminderFormDialog(                                       
+      313 +    clients: List<Client>,                                    
+      314 +    onDismiss: () -> Unit,                                    
+      315 +    onSave: (MaintenanceReminder) -> Unit                     
+      316 +) {                                                           
+      317 +    val context = LocalContext.current                        
+      318 +    val calendar = remember { Calendar.getInstance() }        
+      319 +    val dateSdf  = SimpleDateFormat("dd/MM/yyyy", Locale.getDe
+          +fault())                                                      
+      320 +                                                              
+      321 +    var dateStr  by remember { mutableStateOf("") }           
+      322 +    var timeStr  by remember { mutableStateOf("") }           
+      323      var notes    by remember { mutableStateOf("") }
+      197 -    var selected by remember { mutableStateOf(INTERVAL_OPTIONS
+          -[4]) } // default 3 meses                                     
+      198 -    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale
+          -.getDefault()) }                                              
+      324 +    var equipmentType by remember { mutableStateOf("") }      
+      325 +    var selected by remember { mutableStateOf(INTERVAL_OPTIONS
+          +[0]) }                                                        
+      326 +    var selectedClient         by remember { mutableStateOf<Cl
+          +ient?>(null) }                                                
+      327 +    var clientDropdownExpanded by remember { mutableStateOf(fa
+          +lse) }                                                        
+      328  
+      329 +    val equipmentIcons = mapOf(                               
+      330 +        "Nevera"             to Icons.Default.AcUnit,         
+      331 +        "Aire Acondicionado" to Icons.Default.Air,            
+      332 +        "Lavadora"           to Icons.Default.WaterDrop,      
+      333 +        "Otro"               to Icons.Default.MoreHoriz       
+      334 +    )                                                         
+      335 +                                                              
+      336 +    val timePicker = TimePickerDialog(context, { _, h, min -> 
+      337 +        calendar.set(Calendar.HOUR_OF_DAY, h); calendar.set(Ca
+          +lendar.MINUTE, min)                                           
+      338 +        timeStr = String.format("%02d:%02d", h, min)          
+      339 +    }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calend
+          +ar.MINUTE), true)                                             
+      340 +                                                              
+      341 +    val datePicker = DatePickerDialog(context, { _, y, m, d ->
+      342 +        calendar.set(y, m, d)                                 
+      343 +        dateStr = String.format("%02d/%02d/%04d", d, m + 1, y)
+      344 +        timePicker.show()                                     
+      345 +    }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONT
+          +H), calendar.get(Calendar.DAY_OF_MONTH))                      
+      346 +                                                              
+      347      Dialog(onDismissRequest = onDismiss, properties = DialogPr
+           operties(usePlatformDefaultWidth = false)) {
+      348          Surface(
+      202 -            modifier = Modifier.fillMaxWidth().padding(horizon
+          -tal = 20.dp),                                                 
+      349 +            modifier = Modifier.fillMaxWidth().padding(horizon
+          +tal = 16.dp),                                                 
+      350              shape = RoundedCornerShape(24.dp),
+      351              color = Color.White
+      352          ) {
+      206 -            Column(modifier = Modifier.padding(24.dp), vertica
+          -lArrangement = Arrangement.spacedBy(16.dp)) {                 
+      353 +            Column(                                           
+      354 +                modifier = Modifier                           
+      355 +                    .padding(24.dp)                           
+      356 +                    .verticalScroll(rememberScrollState()),   
+      357 +                verticalArrangement = Arrangement.spacedBy(16.
+          +dp)                                                           
+      358 +            ) {                                               
+      359                  // Encabezado
+      208 -                Row(verticalAlignment = Alignment.CenterVertic
+          -ally, horizontalArrangement = Arrangement.spacedBy(12.dp)) {  
+      360 +                Row(verticalAlignment = Alignment.CenterVertic
+          +ally,                                                         
+      361 +                    horizontalArrangement = Arrangement.spaced
+          +By(12.dp)) {                                                  
+      362                      Box(
+      210 -                        modifier = Modifier.size(44.dp).clip(R
+          -oundedCornerShape(12.dp)).background(Primary40),              
+      363 +                        modifier = Modifier.size(44.dp).clip(R
+          +oundedCornerShape(12.dp))                                     
+      364 +                            .background(Primary40),           
+      365                          contentAlignment = Alignment.Center
+      366                      ) {
+      213 -                        Icon(Icons.Default.Engineering, null, 
+          -tint = Color.White, modifier = Modifier.size(24.dp))          
+      367 +                        Icon(Icons.Default.Engineering, null, 
+          +tint = Color.White,                                           
+      368 +                            modifier = Modifier.size(24.dp))  
+      369                      }
+      215 -                    Text("Nuevo Recordatorio", style = Materia
+          -lTheme.typography.titleMedium, fontWeight = FontWeight.Bold)  
+      370 +                    Text("Nuevo Mantenimiento",               
+      371 +                        style = MaterialTheme.typography.title
+          +Medium,                                                       
+      372 +                        fontWeight = FontWeight.Bold)         
+      373                  }
+      374  
+      375                  HorizontalDivider()
+      376  
+      220 -                OutlinedTextField(value = equipId, onValueChan
+          -ge = { equipId = it },                                        
+      221 -                    label = { Text("ID / Nombre del equipo") }
+          -,                                                             
+      222 -                    leadingIcon = { Icon(Icons.Default.Enginee
+          -ring, null) },                                                
+      223 -                    modifier = Modifier.fillMaxWidth(), single
+          -Line = true,                                                  
+      224 -                    shape = RoundedCornerShape(12.dp))        
+      225 -                OutlinedTextField(value = notes, onValueChange
+          - = { notes = it },                                            
+      226 -                    label = { Text("Notas (opcional)") },     
+      227 -                    modifier = Modifier.fillMaxWidth(), single
+          -Line = true,                                                  
+      228 -                    shape = RoundedCornerShape(12.dp))        
+      229 -                                                              
+      230 -                Text("Próximo mantenimiento en:", style = Mate
+          -rialTheme.typography.labelMedium,                             
+      231 -                    fontWeight = FontWeight.SemiBold, color = 
+          -MaterialTheme.colorScheme.onSurfaceVariant)                   
+      232 -                                                              
+      233 -                // Semanas                                    
+      234 -                Row(modifier = Modifier.fillMaxWidth(), horizo
+          -ntalArrangement = Arrangement.spacedBy(8.dp)) {               
+      235 -                    INTERVAL_OPTIONS.filter { it.unit == Inter
+          -valUnit.WEEKS }.forEach { opt ->                              
+      236 -                        ReminderIntervalPill(label = opt.label
+          -, selected = selected == opt,                                 
+      237 -                            onClick = { selected = opt }, modi
+          -fier = Modifier.weight(1f))                                   
+      377 +                // ── Cliente                                 
+      378 +                Column(verticalArrangement = Arrangement.space
+          +dBy(6.dp)) {                                                  
+      379 +                    Text("CLIENTE *", style = MaterialTheme.ty
+          +pography.labelSmall,                                          
+      380 +                        fontWeight = FontWeight.Bold, color = 
+          +MaterialTheme.colorScheme.primary,                            
+      381 +                        letterSpacing = 1.sp)                 
+      382 +                    Box(modifier = Modifier.fillMaxWidth()) { 
+      383 +                        Surface(                              
+      384 +                            modifier = Modifier.fillMaxWidth()
+      385 +                                .clickable { clientDropdownExp
+          +anded = !clientDropdownExpanded },                            
+      386 +                            shape = RoundedCornerShape(14.dp),
+      387 +                            color = Color.White,              
+      388 +                            shadowElevation = 2.dp            
+      389 +                        ) {                                   
+      390 +                            Row(                              
+      391 +                                modifier = Modifier.padding(ho
+          +rizontal = 14.dp, vertical = 12.dp),                          
+      392 +                                verticalAlignment = Alignment.
+          +CenterVertically,                                             
+      393 +                                horizontalArrangement = Arrang
+          +ement.spacedBy(10.dp)                                         
+      394 +                            ) {                               
+      395 +                                Icon(Icons.Default.Person, nul
+          +l,                                                            
+      396 +                                    tint = MaterialTheme.color
+          +Scheme.onSurfaceVariant,                                      
+      397 +                                    modifier = Modifier.size(2
+          +0.dp))                                                        
+      398 +                                Text(                         
+      399 +                                    selectedClient?.let {     
+      400 +                                        "${it.name}${if (it.la
+          +stName.isNotBlank()) " ${it.lastName}" else ""}"              
+      401 +                                    } ?: "Seleccione un client
+          +e",                                                           
+      402 +                                    modifier = Modifier.weight
+          +(1f),                                                         
+      403 +                                    style = MaterialTheme.typo
+          +graphy.bodyMedium,                                            
+      404 +                                    color = if (selectedClient
+          + != null)                                                     
+      405 +                                        MaterialTheme.colorSch
+          +eme.onSurface                                                 
+      406 +                                    else MaterialTheme.colorSc
+          +heme.onSurfaceVariant                                         
+      407 +                                )                             
+      408 +                                Icon(Icons.Default.KeyboardArr
+          +owDown, null,                                                 
+      409 +                                    tint = MaterialTheme.color
+          +Scheme.onSurfaceVariant,                                      
+      410 +                                    modifier = Modifier.size(2
+          +0.dp))                                                        
+      411 +                            }                                 
+      412 +                        }                                     
+      413 +                        DropdownMenu(                         
+      414 +                            expanded = clientDropdownExpanded,
+      415 +                            onDismissRequest = { clientDropdow
+          +nExpanded = false },                                          
+      416 +                            modifier = Modifier.fillMaxWidth()
+      417 +                        ) {                                   
+      418 +                            if (clients.isEmpty()) {          
+      419 +                                DropdownMenuItem(             
+      420 +                                    text = { Text("Sin cliente
+          +s registrados",                                               
+      421 +                                        color = MaterialTheme.
+          +colorScheme.onSurfaceVariant) },                              
+      422 +                                    onClick = { clientDropdown
+          +Expanded = false })                                           
+      423 +                            } else {                          
+      424 +                                clients.forEach { c ->        
+      425 +                                    DropdownMenuItem(         
+      426 +                                        text = { Text("${c.nam
+          +e} ${c.lastName}".trim()) },                                  
+      427 +                                        onClick = { selectedCl
+          +ient = c; clientDropdownExpanded = false },                   
+      428 +                                        leadingIcon = {       
+      429 +                                            Icon(Icons.Default
+          +.Person, null,                                                
+      430 +                                                tint = Materia
+          +lTheme.colorScheme.primary)                                   
+      431 +                                        }                     
+      432 +                                    )                         
+      433 +                                }                             
+      434 +                            }                                 
+      435 +                        }                                     
+      436                      }
+      437                  }
+      240 -                // Meses                                      
+      241 -                Row(modifier = Modifier.fillMaxWidth(), horizo
+          -ntalArrangement = Arrangement.spacedBy(8.dp)) {               
+      242 -                    INTERVAL_OPTIONS.filter { it.unit == Inter
+          -valUnit.MONTHS }.forEach { opt ->                             
+      243 -                        ReminderIntervalPill(label = opt.label
+          -, selected = selected == opt,                                 
+      244 -                            onClick = { selected = opt }, modi
+          -fier = Modifier.weight(1f))                                   
+      438 +                                                              
+      439 +                // ── Tipo de Equipo                          
+      440 +                Column(verticalArrangement = Arrangement.space
+          +dBy(8.dp)) {                                                  
+      441 +                    Text("TIPO DE EQUIPO", style = MaterialThe
+          +me.typography.labelSmall,                                     
+      442 +                        fontWeight = FontWeight.Bold, color = 
+          +MaterialTheme.colorScheme.primary,                            
+      443 +                        letterSpacing = 1.sp)                 
+      444 +                    Column(verticalArrangement = Arrangement.s
+          +pacedBy(8.dp)) {                                              
+      445 +                        EQUIPMENT_TYPES.chunked(2).forEach { r
+          +ow ->                                                         
+      446 +                            Row(                              
+      447 +                                horizontalArrangement = Arrang
+          +ement.spacedBy(8.dp),                                         
+      448 +                                modifier = Modifier.fillMaxWid
+          +th()                                                          
+      449 +                            ) {                               
+      450 +                                row.forEach { et ->           
+      451 +                                    val sel = equipmentType ==
+          + et                                                           
+      452 +                                    Surface(                  
+      453 +                                        onClick = { equipmentT
+          +ype = if (equipmentType == et) "" else et },                  
+      454 +                                        modifier = Modifier.we
+          +ight(1f),                                                     
+      455 +                                        shape = RoundedCornerS
+          +hape(14.dp),                                                  
+      456 +                                        color = if (sel) Mater
+          +ialTheme.colorScheme.primary.copy(0.10f) else Color.White,    
+      457 +                                        shadowElevation = if (
+          +sel) 0.dp else 2.dp,                                          
+      458 +                                        border = if (sel)     
+      459 +                                            androidx.compose.f
+          +oundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.prima
+          +ry)                                                           
+      460 +                                        else                  
+      461 +                                            androidx.compose.f
+          +oundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline
+          +Variant)                                                      
+      462 +                                    ) {                       
+      463 +                                        Row(                  
+      464 +                                            modifier = Modifie
+          +r.padding(10.dp),                                             
+      465 +                                            verticalAlignment 
+          += Alignment.CenterVertically,                                 
+      466 +                                            horizontalArrangem
+          +ent = Arrangement.spacedBy(8.dp)                              
+      467 +                                        ) {                   
+      468 +                                            Box(              
+      469 +                                                modifier = Mod
+          +ifier.size(30.dp)                                             
+      470 +                                                    .clip(Roun
+          +dedCornerShape(8.dp))                                         
+      471 +                                                    .backgroun
+          +d(MaterialTheme.colorScheme.primary.copy(if (sel) 0.18f else 0
+          +.10f)),                                                       
+      472 +                                                contentAlignme
+          +nt = Alignment.Center                                         
+      473 +                                            ) {               
+      474 +                                                Icon(equipment
+          +Icons[et] ?: Icons.Default.Build, null,                       
+      475 +                                                    tint = Mat
+          +erialTheme.colorScheme.primary,                               
+      476 +                                                    modifier =
+          + Modifier.size(16.dp))                                        
+      477 +                                            }                 
+      478 +                                            Text(et,          
+      479 +                                                style = Materi
+          +alTheme.typography.bodySmall,                                 
+      480 +                                                fontWeight = i
+          +f (sel) FontWeight.SemiBold else FontWeight.Normal,           
+      481 +                                                color = if (se
+          +l) MaterialTheme.colorScheme.primary                          
+      482 +                                                        else M
+          +aterialTheme.colorScheme.onSurface)                           
+      483 +                                        }                     
+      484 +                                    }                         
+      485 +                                }                             
+      486 +                            }                                 
+      487 +                        }                                     
+      488                      }
+      489                  }
+      490  
+      248 -                // Fecha estimada                             
+      249 -                val cal = Calendar.getInstance().apply {      
+      250 -                    when (selected.unit) {                    
+      251 -                        IntervalUnit.WEEKS  -> add(Calendar.WE
+          -EK_OF_YEAR, selected.value)                                   
+      252 -                        IntervalUnit.MONTHS -> add(Calendar.MO
+          -NTH, selected.value)                                          
+      491 +                // ── Fecha y Hora de la visita               
+      492 +                Column(verticalArrangement = Arrangement.space
+          +dBy(6.dp)) {                                                  
+      493 +                    Text("FECHA Y HORA DE LA VISITA *", style 
+          += MaterialTheme.typography.labelSmall,                        
+      494 +                        fontWeight = FontWeight.Bold, color = 
+          +MaterialTheme.colorScheme.primary,                            
+      495 +                        letterSpacing = 1.sp)                 
+      496 +                    Surface(                                  
+      497 +                        modifier = Modifier.fillMaxWidth().cli
+          +ckable { datePicker.show() },                                 
+      498 +                        shape = RoundedCornerShape(14.dp),    
+      499 +                        color = Color.White,                  
+      500 +                        shadowElevation = 2.dp                
+      501 +                    ) {                                       
+      502 +                        Row(                                  
+      503 +                            modifier = Modifier.padding(horizo
+          +ntal = 14.dp, vertical = 12.dp),                              
+      504 +                            verticalAlignment = Alignment.Cent
+          +erVertically,                                                 
+      505 +                            horizontalArrangement = Arrangemen
+          +t.spacedBy(10.dp)                                             
+      506 +                        ) {                                   
+      507 +                            Icon(Icons.Default.CalendarToday, 
+          +null,                                                         
+      508 +                                tint = MaterialTheme.colorSche
+          +me.onSurfaceVariant,                                          
+      509 +                                modifier = Modifier.size(20.dp
+          +))                                                            
+      510 +                            Text(                             
+      511 +                                if (dateStr.isNotBlank() && ti
+          +meStr.isNotBlank()) "$dateStr  $timeStr"                      
+      512 +                                else "Seleccionar fecha y hora
+          +",                                                            
+      513 +                                modifier = Modifier.weight(1f)
+          +,                                                             
+      514 +                                style = MaterialTheme.typograp
+          +hy.bodyMedium,                                                
+      515 +                                color = if (dateStr.isNotBlank
+          +())                                                           
+      516 +                                    MaterialTheme.colorScheme.
+          +onSurface                                                     
+      517 +                                else MaterialTheme.colorScheme
+          +.onSurfaceVariant                                             
+      518 +                            )                                 
+      519 +                            Icon(Icons.Default.EditCalendar, n
+          +ull,                                                          
+      520 +                                tint = MaterialTheme.colorSche
+          +me.primary,                                                   
+      521 +                                modifier = Modifier.size(20.dp
+          +))                                                            
+      522 +                        }                                     
+      523                      }
+      524                  }
+      255 -                Surface(shape = RoundedCornerShape(12.dp), col
+          -or = Primary40.copy(alpha = 0.08f)) {                         
+      256 -                    Row(modifier = Modifier.fillMaxWidth().pad
+          -ding(12.dp),                                                  
+      257 -                        horizontalArrangement = Arrangement.sp
+          -acedBy(8.dp),                                                 
+      258 -                        verticalAlignment = Alignment.CenterVe
+          -rtically) {                                                   
+      259 -                        Icon(Icons.Default.CalendarToday, null
+          -, tint = Primary40, modifier = Modifier.size(16.dp))          
+      260 -                        Text("Próximo: ${sdf.format(cal.time)}
+          -",                                                            
+      261 -                            style = MaterialTheme.typography.b
+          -odySmall,                                                     
+      262 -                            fontWeight = FontWeight.Medium, co
+          -lor = Primary40)                                              
+      525 +                                                              
+      526 +                // ── Intervalo siguiente mantenimiento       
+      527 +                Column(verticalArrangement = Arrangement.space
+          +dBy(8.dp)) {                                                  
+      528 +                    Text("REPETIR CADA", style = MaterialTheme
+          +.typography.labelSmall,                                       
+      529 +                        fontWeight = FontWeight.Bold, color = 
+          +MaterialTheme.colorScheme.primary,                            
+      530 +                        letterSpacing = 1.sp)                 
+      531 +                    Row(modifier = Modifier.fillMaxWidth(),   
+      532 +                        horizontalArrangement = Arrangement.sp
+          +acedBy(8.dp)) {                                               
+      533 +                        INTERVAL_OPTIONS.forEach { opt ->     
+      534 +                            ReminderIntervalPill(             
+      535 +                                label = opt.label,            
+      536 +                                selected = selected == opt,   
+      537 +                                onClick = { selected = opt }, 
+      538 +                                modifier = Modifier.weight(1f)
+      539 +                            )                                 
+      540 +                        }                                     
+      541                      }
+      542                  }
+      543  
+      544 +                // ── Notas                                   
+      545 +                OutlinedTextField(                            
+      546 +                    value = notes,                            
+      547 +                    onValueChange = { notes = it },           
+      548 +                    label = { Text("Notas (opcional)") },     
+      549 +                    modifier = Modifier.fillMaxWidth(),       
+      550 +                    minLines = 2,                             
+      551 +                    shape = RoundedCornerShape(12.dp)         
+      552 +                )                                             
+      553 +                                                              
+      554                  HorizontalDivider()
+      555  
+      268 -                Row(modifier = Modifier.fillMaxWidth(), horizo
+          -ntalArrangement = Arrangement.spacedBy(12.dp)) {              
+      269 -                    OutlinedButton(onClick = onDismiss, modifi
+          -er = Modifier.weight(1f), shape = RoundedCornerShape(50)) {   
+      270 -                        Text("Cancelar")                      
+      271 -                    }                                         
+      556 +                // Botones                                    
+      557 +                Row(modifier = Modifier.fillMaxWidth(),       
+      558 +                    horizontalArrangement = Arrangement.spaced
+          +By(12.dp)) {                                                  
+      559 +                    OutlinedButton(                           
+      560 +                        onClick = onDismiss,                  
+      561 +                        modifier = Modifier.weight(1f),       
+      562 +                        shape = RoundedCornerShape(50)        
+      563 +                    ) { Text("Cancelar") }                    
+      564                      Button(
+      565                          onClick = {
+      274 -                            val now = System.currentTimeMillis
+          -()                                                            
+      275 -                            val saveCal = Calendar.getInstance
+          -()                                                            
+      276 -                            when (selected.unit) {            
+      277 -                                IntervalUnit.WEEKS  -> saveCal
+          -.add(Calendar.WEEK_OF_YEAR, selected.value)                   
+      278 -                                IntervalUnit.MONTHS -> saveCal
+          -.add(Calendar.MONTH, selected.value)                          
+      566 +                            val client = selectedClient ?: ret
+          +urn@Button                                                    
+      567 +                            val nextCal = Calendar.getInstance
+          +().apply {                                                    
+      568 +                                timeInMillis = calendar.timeIn
+          +Millis                                                        
+      569 +                                add(Calendar.MONTH, selected.v
+          +alue)                                                         
+      570                              }
+      280 -                            val approxMonths = when (selected.
+          -unit) {                                                       
+      281 -                                IntervalUnit.WEEKS  -> (select
+          -ed.value / 4.0).coerceAtLeast(1.0).toInt()                    
+      282 -                                IntervalUnit.MONTHS -> selecte
+          -d.value                                                       
+      283 -                            }                                 
+      571                              onSave(MaintenanceReminder(
+      285 -                                equipmentId   = equipId.trim()
+          -,                                                             
+      286 -                                intervalValue = selected.value
+          -,                                                             
+      287 -                                intervalUnit  = selected.unit,
+      288 -                                intervalMonths = approxMonths,
+      289 -                                lastServiceDate = now,        
+      290 -                                nextServiceDate = saveCal.time
+          -InMillis,                                                     
+      291 -                                notes = notes.trim()          
+      572 +                                equipmentType  = equipmentType
+          +,                                                             
+      573 +                                clientId       = client.id,   
+      574 +                                intervalValue  = selected.valu
+          +e,                                                            
+      575 +                                intervalUnit   = selected.unit
+          +,                                                             
+      576 +                                intervalMonths = selected.valu
+          +e,                                                            
+      577 +                                lastServiceDate = 0L,         
+      578 +                                nextServiceDate = calendar.tim
+          +eInMillis,                                                    
+      579 +                                notes          = notes.trim(),
+      580 +                                source         = REMINDER_SOUR
+          +CE_MANUAL                                                     
+      581                              ))
+      582                          },
+      583 +                        enabled = selectedClient != null && da
+          +teStr.isNotBlank() && timeStr.isNotBlank(),                   
+      584                          modifier = Modifier.weight(1f),
+      585                          shape = RoundedCornerShape(50),
+      586                          colors = ButtonDefaults.buttonColors(c
+           ontainerColor = Color.Transparent),
+     ...
+      588                      ) {
+      589                          Box(
+      590                              modifier = Modifier.fillMaxWidth()
+      301 -                                .background(Brush.linearGradie
+          -nt(listOf(Primary40, Secondary40)), RoundedCornerShape(50))   
+      591 +                                .background(                  
+      592 +                                    Brush.linearGradient(listO
+          +f(Primary40, Secondary40)),                                   
+      593 +                                    RoundedCornerShape(50)    
+      594 +                                )                             
+      595                                  .padding(vertical = 12.dp),
+      596                              contentAlignment = Alignment.Cente
+           r
+      597                          ) {
+     ...
+      604      }
+      605  }
+      606  
+      607 +// ─── Detalle del mantenimiento ─────────────────────────────
+          +────────────────────                                          
+      608  @Composable
+      315 -private fun ReminderIntervalPill(label: String, selected: Bool
+          -ean, onClick: () -> Unit, modifier: Modifier = Modifier) {    
+      609 +fun ReminderDetailDialog(                                     
+      610 +    r: MaintenanceReminder,                                   
+      611 +    client: Client?,                                          
+      612 +    onDismiss: () -> Unit,                                    
+      613 +    onMarkDone: () -> Unit,                                   
+      614 +    onDelete: () -> Unit                                      
+      615 +) {                                                           
+      616 +    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault
+          +())                                                           
+      617 +    val sdfFull = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.
+          +getDefault())                                                 
+      618 +    val now = System.currentTimeMillis()                      
+      619 +    val isDue = r.nextServiceDate <= now                      
+      620 +    val isAuto = r.source == REMINDER_SOURCE_AUTO             
+      621 +    val shortId = "MT-${r.id.take(6).uppercase()}"            
+      622 +    val color = if (isDue) StatusLowStock else StatusCompleted
+      623 +                                                              
+      624 +    Dialog(onDismissRequest = onDismiss, properties = DialogPr
+          +operties(usePlatformDefaultWidth = false)) {                  
+      625 +        Surface(                                              
+      626 +            modifier = Modifier.fillMaxWidth().padding(horizon
+          +tal = 16.dp),                                                 
+      627 +            shape = RoundedCornerShape(24.dp),                
+      628 +            color = Color.White                               
+      629 +        ) {                                                   
+      630 +            Column(modifier = Modifier.padding(24.dp),        
+      631 +                verticalArrangement = Arrangement.spacedBy(14.
+          +dp)) {                                                        
+      632 +                                                              
+      633 +                // ID + tipo en la parte superior             
+      634 +                Row(verticalAlignment = Alignment.CenterVertic
+          +ally,                                                         
+      635 +                    horizontalArrangement = Arrangement.spaced
+          +By(8.dp)) {                                                   
+      636 +                    Surface(shape = RoundedCornerShape(8.dp), 
+          +color = Primary40.copy(0.12f)) {                              
+      637 +                        Text(shortId,                         
+      638 +                            modifier = Modifier.padding(horizo
+          +ntal = 10.dp, vertical = 5.dp),                               
+      639 +                            style = MaterialTheme.typography.l
+          +abelMedium,                                                   
+      640 +                            fontWeight = FontWeight.Bold, colo
+          +r = Primary40)                                                
+      641 +                    }                                         
+      642 +                    Surface(                                  
+      643 +                        shape = RoundedCornerShape(8.dp),     
+      644 +                        color = if (isAuto) Secondary40.copy(0
+          +.15f) else Tertiary40.copy(0.15f)                             
+      645 +                    ) {                                       
+      646 +                        Text(if (isAuto) "Auto" else "Manual",
+      647 +                            modifier = Modifier.padding(horizo
+          +ntal = 10.dp, vertical = 5.dp),                               
+      648 +                            style = MaterialTheme.typography.l
+          +abelMedium,                                                   
+      649 +                            color = if (isAuto) Secondary40 el
+          +se Tertiary40)                                                
+      650 +                    }                                         
+      651 +                    Spacer(Modifier.weight(1f))               
+      652 +                    IconButton(onClick = onDismiss) {         
+      653 +                        Icon(Icons.Default.Close, null,       
+      654 +                            tint = MaterialTheme.colorScheme.o
+          +nSurfaceVariant)                                              
+      655 +                    }                                         
+      656 +                }                                             
+      657 +                                                              
+      658 +                HorizontalDivider()                           
+      659 +                                                              
+      660 +                // Cliente                                    
+      661 +                if (client != null) {                         
+      662 +                    DetailRow(                                
+      663 +                        icon = { Icon(Icons.Default.Person, nu
+          +ll, tint = Primary40, modifier = Modifier.size(20.dp)) },     
+      664 +                        label = "Cliente",                    
+      665 +                        value = "${client.name}${if (client.la
+          +stName.isNotBlank()) " ${client.lastName}" else ""}"          
+      666 +                    )                                         
+      667 +                }                                             
+      668 +                                                              
+      669 +                // Equipo                                     
+      670 +                if (r.equipmentType.isNotBlank()) {           
+      671 +                    DetailRow(                                
+      672 +                        icon = { Icon(Icons.Default.Build, nul
+          +l, tint = Primary40, modifier = Modifier.size(20.dp)) },      
+      673 +                        label = "Equipo",                     
+      674 +                        value = r.equipmentType               
+      675 +                    )                                         
+      676 +                }                                             
+      677 +                                                              
+      678 +                // Notas                                      
+      679 +                if (r.notes.isNotBlank()) {                   
+      680 +                    DetailRow(                                
+      681 +                        icon = { Icon(Icons.Default.Notes, nul
+          +l, tint = Primary40, modifier = Modifier.size(20.dp)) },      
+      682 +                        label = "Notas",                      
+      683 +                        value = r.notes                       
+      684 +                    )                                         
+      685 +                }                                             
+      686 +                                                              
+      687 +                // Fecha(s) según fuente                      
+      688 +                if (isAuto) {                                 
+      689 +                    if (r.lastServiceDate > 0L) {             
+      690 +                        DetailRow(                            
+      691 +                            icon = { Icon(Icons.Default.Histor
+          +y, null, tint = Primary40, modifier = Modifier.size(20.dp)) },
+      692 +                            label = "Último servicio",        
+      693 +                            value = sdf.format(Date(r.lastServ
+          +iceDate))                                                     
+      694 +                        )                                     
+      695 +                    }                                         
+      696 +                    DetailRow(                                
+      697 +                        icon = { Icon(Icons.Default.CalendarTo
+          +day, null, tint = color, modifier = Modifier.size(20.dp)) },  
+      698 +                        label = "Próximo servicio",           
+      699 +                        value = sdf.format(Date(r.nextServiceD
+          +ate)),                                                        
+      700 +                        valueColor = color                    
+      701 +                    )                                         
+      702 +                    val intervalText = when (r.intervalValue) 
+          +{                                                             
+      703 +                        12 -> "Cada 1 año"                    
+      704 +                        else -> "Cada ${r.intervalValue} mes(e
+          +s)"                                                           
+      705 +                    }                                         
+      706 +                    DetailRow(                                
+      707 +                        icon = { Icon(Icons.Default.Repeat, nu
+          +ll, tint = Primary40, modifier = Modifier.size(20.dp)) },     
+      708 +                        label = "Intervalo",                  
+      709 +                        value = intervalText                  
+      710 +                    )                                         
+      711 +                } else {                                      
+      712 +                    DetailRow(                                
+      713 +                        icon = { Icon(Icons.Default.CalendarTo
+          +day, null, tint = color, modifier = Modifier.size(20.dp)) },  
+      714 +                        label = "Fecha programada",           
+      715 +                        value = if (r.nextServiceDate > 0L) sd
+          +fFull.format(Date(r.nextServiceDate)) else "Sin fecha",       
+      716 +                        valueColor = color                    
+      717 +                    )                                         
+      718 +                    val intervalText = when (r.intervalValue) 
+          +{                                                             
+      719 +                        12 -> "Repite cada 1 año"             
+      720 +                        else -> "Repite cada ${r.intervalValue
+          +} mes(es)"                                                    
+      721 +                    }                                         
+      722 +                    DetailRow(                                
+      723 +                        icon = { Icon(Icons.Default.Repeat, nu
+          +ll, tint = Primary40, modifier = Modifier.size(20.dp)) },     
+      724 +                        label = "Intervalo",                  
+      725 +                        value = intervalText                  
+      726 +                    )                                         
+      727 +                }                                             
+      728 +                                                              
+      729 +                HorizontalDivider()                           
+      730 +                                                              
+      731 +                // Botones de acción                          
+      732 +                Column(verticalArrangement = Arrangement.space
+          +dBy(8.dp)) {                                                  
+      733 +                    if (isDue) {                              
+      734 +                        Button(                               
+      735 +                            onClick = onMarkDone,             
+      736 +                            modifier = Modifier.fillMaxWidth()
+          +,                                                             
+      737 +                            colors = ButtonDefaults.buttonColo
+          +rs(containerColor = StatusCompleted)                          
+      738 +                        ) {                                   
+      739 +                            Icon(Icons.Default.CheckCircle, nu
+          +ll, modifier = Modifier.size(16.dp))                          
+      740 +                            Spacer(Modifier.width(6.dp))      
+      741 +                            Text("Marcar como realizado")     
+      742 +                        }                                     
+      743 +                    }                                         
+      744 +                    OutlinedButton(                           
+      745 +                        onClick = onDelete,                   
+      746 +                        modifier = Modifier.fillMaxWidth(),   
+      747 +                        colors = ButtonDefaults.outlinedButton
+          +Colors(contentColor = StatusLowStock),                        
+      748 +                        border = androidx.compose.foundation.B
+          +orderStroke(1.dp, StatusLowStock)                             
+      749 +                    ) {                                       
+      750 +                        Icon(Icons.Default.Delete, null, modif
+          +ier = Modifier.size(16.dp))                                   
+      751 +                        Spacer(Modifier.width(6.dp))          
+      752 +                        Text("Eliminar recordatorio")         
+      753 +                    }                                         
+      754 +                }                                             
+      755 +            }                                                 
+      756 +        }                                                     
+      757 +    }                                                         
+      758 +}                                                             
+      759 +                                                              
+      760 +@Composable                                                   
+      761 +private fun DetailRow(                                        
+      762 +    icon: @Composable () -> Unit,                             
+      763 +    label: String,                                            
+      764 +    value: String,                                            
+      765 +    valueColor: Color = Color.Unspecified                     
+      766 +) {                                                           
+      767 +    Row(horizontalArrangement = Arrangement.spacedBy(12.dp),  
+      768 +        verticalAlignment = Alignment.CenterVertically) {     
+      769 +        icon()                                                
+      770 +        Column {                                              
+      771 +            Text(label, style = MaterialTheme.typography.label
+          +Small,                                                        
+      772 +                color = MaterialTheme.colorScheme.onSurfaceVar
+          +iant)                                                         
+      773 +            Text(value, style = MaterialTheme.typography.bodyM
+          +edium,                                                        
+      774 +                fontWeight = FontWeight.Medium,               
+      775 +                color = if (valueColor == Color.Unspecified)  
+      776 +                    MaterialTheme.colorScheme.onSurface else v
+          +alueColor)                                                    
+      777 +        }                                                     
+      778 +    }                                                         
+      779 +}                                                             
+      780 +                                                              
+      781 +@Composable                                                   
+      782 +private fun ReminderIntervalPill(                             
+      783 +    label: String, selected: Boolean, onClick: () -> Unit, mod
+          +ifier: Modifier = Modifier                                    
+      784 +) {                                                           
+      785      Surface(
+      786          onClick = onClick,
+      787          shape = RoundedCornerShape(50),
+
+● Ahora actualizo ServiceViewModel.kt para que los recordatorios generados desde
+  servicios tengan source = "AUTO", y agrego el ID en AppointmentCard:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\services\ServiceViewModel.k
+        t)
+  ⎿  Added 1 line
+       6  import com.gestion.itinerario.data.entity.AppointmentStatus
+       7  import com.gestion.itinerario.data.entity.IntervalUnit
+       8  import com.gestion.itinerario.data.entity.MaintenanceReminder
+       9 +import com.gestion.itinerario.data.entity.REMINDER_SOURCE_AUTO 
+      10  import com.gestion.itinerario.data.entity.ServiceOrder
+      11  import com.gestion.itinerario.data.entity.ServiceStatus
+      12  import com.gestion.itinerario.data.repository.AppointmentReposi
+          tory
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\services\ServiceViewModel.k
+        t)
+  ⎿  Added 2 lines, removed 1 line
+      112              intervalMonths = approxMonths,
+      113              lastServiceDate = now,
+      114              nextServiceDate = cal.timeInMillis,
+      115 -            notes = notes                                     
+      115 +            notes = notes,                                    
+      116 +            source = REMINDER_SOURCE_AUTO                     
+      117          ))
+      118      }
+      119  }
+
+● Ahora agrego el chip de ID en AppointmentCard en AgendaScreen:
+
+● Update(app\src\main\java\com\gestion\itinerario\ui\agenda\AgendaScreen.kt)
+  ⎿  Added 10 lines
+      467              Box(modifier = Modifier.width(5.dp).fillMaxHeight(
+           )
+      468                  .background(accentColor, RoundedCornerShape(to
+           pStart = 12.dp, bottomStart = 12.dp)))
+      469              Column(modifier = Modifier.padding(12.dp).weight(1
+           f)) {
+      470 +                // ID auto-generado (no editable) en la parte 
+          +superior                                                      
+      471 +                if (a.id.isNotBlank()) {                      
+      472 +                    Surface(shape = RoundedCornerShape(6.dp), 
+          +color = accentColor.copy(0.12f)) {                            
+      473 +                        Text("CT-${a.id.take(6).uppercase()}",
+      474 +                            modifier = Modifier.padding(horizo
+          +ntal = 7.dp, vertical = 3.dp),                                
+      475 +                            style = MaterialTheme.typography.l
+          +abelSmall,                                                    
+      476 +                            fontWeight = FontWeight.Bold, colo
+          +r = accentColor)                                              
+      477 +                    }                                         
+      478 +                    Spacer(Modifier.height(4.dp))             
+      479 +                }                                             
+      480                  Row(verticalAlignment = Alignment.CenterVertic
+           ally, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      481                      Icon(if (isMantenimiento) Icons.Default.Bu
+           ild else Icons.Default.EventAvailable,
+      482                          null, tint = accentColor, modifier = M
+           odifier.size(18.dp))
+
+● Ahora compilo para verificar:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● API Error: Unable to connect to API (ConnectionRefused)
+
+✻ Cogitated for 16m 26s
+
+● Background command "Compilar APK debug con todos los cambios" completed (exit
+code 0)
+
+● API Error: Unable to connect to API (ConnectionRefused)
+
+✻ Cogitated for 4m 15s
+> continua                                                                      
+
+● API Error: Unable to connect to API (ConnectionRefused)
+
+✻ Baked for 4m 21s

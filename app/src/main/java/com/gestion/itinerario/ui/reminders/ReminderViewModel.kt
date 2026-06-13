@@ -11,9 +11,11 @@ import com.gestion.itinerario.data.entity.ServiceType
 import com.gestion.itinerario.data.repository.ClientRepository
 import com.gestion.itinerario.data.repository.ReminderRepository
 import com.gestion.itinerario.data.repository.ServiceRepository
+import com.gestion.itinerario.workers.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -23,7 +25,8 @@ import javax.inject.Inject
 class ReminderViewModel @Inject constructor(
     private val repo: ReminderRepository,
     private val clientRepo: ClientRepository,
-    private val serviceRepo: ServiceRepository
+    private val serviceRepo: ServiceRepository,
+    private val alarmScheduler: AlarmScheduler
 ) : ViewModel() {
     val reminders: StateFlow<List<MaintenanceReminder>> = repo.getActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -33,6 +36,8 @@ class ReminderViewModel @Inject constructor(
 
     fun save(r: MaintenanceReminder) = viewModelScope.launch {
         val reminderId = repo.save(r)
+        val saved = r.copy(id = reminderId)
+        alarmScheduler.scheduleReminder(saved, clientName(r.clientId))
         serviceRepo.save(ServiceOrder(
             clientId = r.clientId,
             equipmentType = r.equipmentType,
@@ -48,11 +53,19 @@ class ReminderViewModel @Inject constructor(
         ))
     }
 
-    fun update(r: MaintenanceReminder) = viewModelScope.launch { repo.update(r) }
+    fun update(r: MaintenanceReminder) = viewModelScope.launch {
+        alarmScheduler.cancelReminder(r.id)
+        repo.update(r)
+        alarmScheduler.scheduleReminder(r, clientName(r.clientId))
+    }
 
-    fun delete(r: MaintenanceReminder) = viewModelScope.launch { repo.delete(r) }
+    fun delete(r: MaintenanceReminder) = viewModelScope.launch {
+        alarmScheduler.cancelReminder(r.id)
+        repo.delete(r)
+    }
 
     fun markDone(r: MaintenanceReminder) = viewModelScope.launch {
+        alarmScheduler.cancelReminder(r.id)
         val cal = Calendar.getInstance()
         val last = cal.timeInMillis
         when (r.intervalUnit) {
@@ -68,7 +81,7 @@ class ReminderViewModel @Inject constructor(
             photosAfter  = emptyList()
         )
         repo.update(updated)
-        // Crear ServiceOrder para el siguiente ciclo
+        alarmScheduler.scheduleReminder(updated, clientName(r.clientId))
         serviceRepo.save(ServiceOrder(
             clientId = r.clientId,
             equipmentType = r.equipmentType,
@@ -83,4 +96,8 @@ class ReminderViewModel @Inject constructor(
             sourceReminderId = r.id
         ))
     }
+
+    private suspend fun clientName(clientId: String): String =
+        clientRepo.getAll().first().find { it.id == clientId }
+            ?.let { "${it.name} ${it.lastName}".trim() } ?: "Cliente"
 }

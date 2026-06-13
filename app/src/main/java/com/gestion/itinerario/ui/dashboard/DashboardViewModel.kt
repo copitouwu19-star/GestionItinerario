@@ -14,27 +14,33 @@ import androidx.compose.material.icons.filled.WaterDrop
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.material.icons.filled.Engineering
 import com.gestion.itinerario.data.entity.Appointment
 import com.gestion.itinerario.data.entity.AppointmentStatus
 import com.gestion.itinerario.data.entity.Client
+import com.gestion.itinerario.data.entity.MaintenanceReminder
 import com.gestion.itinerario.data.entity.ServiceOrder
 import com.gestion.itinerario.data.entity.ServiceStatus
 import com.gestion.itinerario.data.entity.ServiceType
 import com.gestion.itinerario.data.repository.AppointmentRepository
 import com.gestion.itinerario.data.repository.ClientRepository
 import com.gestion.itinerario.data.repository.EquipmentRepository
+import com.gestion.itinerario.data.repository.ReminderRepository
 import com.gestion.itinerario.data.repository.ServiceRepository
 import com.gestion.itinerario.ui.theme.StatusCompleted
 import com.gestion.itinerario.ui.theme.StatusInRepair
 import com.gestion.itinerario.ui.theme.StatusPending
 import com.gestion.itinerario.workers.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
@@ -145,6 +151,7 @@ class DashboardViewModel @Inject constructor(
     private val serviceRepo: ServiceRepository,
     private val appointmentRepo: AppointmentRepository,
     private val clientRepo: ClientRepository,
+    private val reminderRepo: ReminderRepository,
     private val alarmScheduler: AlarmScheduler
 ) : ViewModel() {
 
@@ -153,6 +160,11 @@ class DashboardViewModel @Inject constructor(
         FirebaseAuth.getInstance().currentUser?.displayName?.split(" ")?.firstOrNull() ?: ""
     )
     val userName: StateFlow<String> = _userName.asStateFlow()
+
+    // Tick cada 60 s para que recentNotifications recalcule "now" aunque Firestore no emita
+    private val tickFlow = flow<Unit> {
+        while (true) { emit(Unit); delay(60_000L) }
+    }.shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
 
     // Shared base flows — un único listener de Firestore para cada colección
     private val allAppointments: Flow<List<Appointment>> = appointmentRepo.getAll()
@@ -241,6 +253,9 @@ class DashboardViewModel @Inject constructor(
     val clients: StateFlow<List<Client>> = clientRepo.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val allReminders: Flow<List<MaintenanceReminder>> = reminderRepo.getActive()
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
+
     val chartData: StateFlow<List<ChartDay>> = allAppointments
         .map { buildChartData(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -264,19 +279,19 @@ class DashboardViewModel @Inject constructor(
     // ── Notificaciones recientes (derivadas de la actividad existente) ────────
 
     val recentNotifications: StateFlow<List<NotificationItem>> = combine(
-        allAppointments, allOrders, clients
-    ) { appts, orders, clientList ->
+        allAppointments, allOrders, allReminders, clients, tickFlow
+    ) { appts, orders, reminders, clientList, _ ->
         val clientMap = clientList.associateBy { it.id }
         fun clientName(id: String) = clientMap[id]?.let { "${it.name} ${it.lastName}".trim() } ?: "Cliente"
 
         val now = System.currentTimeMillis()
         val items = mutableListOf<NotificationItem>()
-        // Citas futuras (SCHEDULED con dateTime > ahora) se omiten del panel — solo se muestran cuando ya llegó su hora
+
+        // Citas: solo las que ya llegaron a su hora (dateTime <= now) o que ya están en proceso/completadas
         appts.filter {
             it.status != AppointmentStatus.CANCELLED &&
             (it.status != AppointmentStatus.SCHEDULED || it.dateTime <= now)
         }.forEach { a ->
-            val label = "${a.serviceType.shortLabel()} — ${clientName(a.clientId)}"
             val completed = a.status == AppointmentStatus.COMPLETED
             items += NotificationItem(
                 title = when (a.status) {
@@ -284,7 +299,7 @@ class DashboardViewModel @Inject constructor(
                     AppointmentStatus.IN_PROGRESS -> "En proceso"
                     else                          -> "Cita programada"
                 },
-                subtitle = label,
+                subtitle = "${a.serviceType.shortLabel()} — ${clientName(a.clientId)}",
                 timestamp = a.dateTime,
                 icon = a.serviceType.icon(),
                 color = when (a.status) {
@@ -296,6 +311,8 @@ class DashboardViewModel @Inject constructor(
                 statusLabel = a.statusLabel()
             )
         }
+
+        // Órdenes de servicio
         orders.forEach { o ->
             val completed = o.status == ServiceStatus.COMPLETED
             items += NotificationItem(
@@ -316,7 +333,21 @@ class DashboardViewModel @Inject constructor(
                 statusLabel = o.statusLabel()
             )
         }
-        items.sortedWith(compareBy({ it.isCompleted }, { -it.timestamp })).take(30)
+
+        // Mantenimientos: solo los vencidos o cuya hora ya llegó (nextServiceDate <= now)
+        reminders.filter { it.workStatus != "COMPLETED" && it.nextServiceDate <= now }.forEach { r ->
+            items += NotificationItem(
+                title = "Mantenimiento pendiente",
+                subtitle = "${r.equipmentType.ifBlank { "Equipo" }} — ${clientName(r.clientId)}",
+                timestamp = r.nextServiceDate,
+                icon = Icons.Filled.Engineering,
+                color = StatusInRepair,
+                isCompleted = false,
+                statusLabel = "Vencido"
+            )
+        }
+
+        items.sortedWith(compareBy({ it.isCompleted }, { -it.timestamp })).take(40)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Agrupa notificaciones/actividad por día: "Hoy", "Ayer", y para días más antiguos muestra la fecha real. */
@@ -444,6 +475,20 @@ class DashboardViewModel @Inject constructor(
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    init {
+        // Al iniciar: marcar como "SIN_ATENDER" las citas SCHEDULED que llevan más de 24h sin atención
+        viewModelScope.launch {
+            val threshold = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            allAppointments.first().filter {
+                it.status == AppointmentStatus.SCHEDULED &&
+                it.dateTime < threshold &&
+                it.attendanceStatus.isEmpty()
+            }.forEach { a ->
+                appointmentRepo.update(a.copy(attendanceStatus = "SIN_ATENDER"))
+            }
+        }
+    }
 
     // ── Acciones ──────────────────────────────────────────────────────────────
 

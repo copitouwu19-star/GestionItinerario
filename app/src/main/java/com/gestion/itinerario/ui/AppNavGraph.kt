@@ -2,6 +2,8 @@ package com.gestion.itinerario.ui
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,9 +38,28 @@ fun AppNavGraph(
     innerPadding: PaddingValues,
     isLoggedIn: Boolean,
     onLogout: () -> Unit,
-    onNavigate: (String) -> Unit = {}
+    onNavigate: (String) -> Unit = {},
+    pendingEntityId: String?   = null,
+    pendingEntityType: String? = null,
+    onNavigationHandled: () -> Unit = {}
 ) {
     val startDestination = if (isLoggedIn) Routes.DASHBOARD else Routes.LOGIN
+
+    // Cuando llega una notificación, navega al tab correcto
+    LaunchedEffect(pendingEntityId, pendingEntityType) {
+        if (pendingEntityId != null && isLoggedIn) {
+            val target = when (pendingEntityType) {
+                "appointment" -> Routes.SERVICES   // abre ServiceDetailScreen
+                "reminder"    -> Routes.REMINDERS
+                else          -> return@LaunchedEffect
+            }
+            navController.navigate(target) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState    = true
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = startDestination) {
 
@@ -82,9 +103,33 @@ fun AppNavGraph(
             )
         }
         composable(Routes.CLIENTS)   { ClientsScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
-        composable(Routes.SERVICES)  { ServicesScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
-        composable(Routes.AGENDA)    { AgendaScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
-        composable(Routes.REMINDERS) { RemindersScreen(innerPadding = innerPadding, onNavigateToProfile = { navController.navigate(Routes.PROFILE) }, onLogout = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } }) }
+        composable(Routes.SERVICES) {
+            ServicesScreen(
+                innerPadding        = innerPadding,
+                onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
+                onLogout            = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } },
+                openDetailAppointmentId = if (pendingEntityType == "appointment") pendingEntityId else null,
+                onDetailHandled     = onNavigationHandled
+            )
+        }
+        composable(Routes.AGENDA) {
+            AgendaScreen(
+                innerPadding        = innerPadding,
+                onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
+                onLogout            = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } },
+                openAppointmentId   = if (pendingEntityType == "appointment") pendingEntityId else null,
+                onOpenHandled       = onNavigationHandled
+            )
+        }
+        composable(Routes.REMINDERS) {
+            RemindersScreen(
+                innerPadding      = innerPadding,
+                onNavigateToProfile = { navController.navigate(Routes.PROFILE) },
+                onLogout          = { onLogout(); navController.navigate(Routes.LOGIN) { popUpTo(0) { inclusive = true } } },
+                openReminderId    = if (pendingEntityType == "reminder") pendingEntityId else null,
+                onOpenHandled     = onNavigationHandled
+            )
+        }
         composable(Routes.PROFILE) {
             ProfileScreen(innerPadding = innerPadding, onBack = { navController.popBackStack() })
         }

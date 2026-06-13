@@ -44,7 +44,9 @@ fun ServicesScreen(
     onLogout: () -> Unit = {},
     viewModel: ServiceViewModel = hiltViewModel(),
     agendaViewModel: com.gestion.itinerario.ui.agenda.AgendaViewModel = hiltViewModel(),
-    profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
+    profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel(),
+    openDetailAppointmentId: String? = null,
+    onDetailHandled: () -> Unit = {}
 ) {
     val orders                by viewModel.orders.collectAsStateWithLifecycle()
     val allAppointments by viewModel.allAppointments.collectAsStateWithLifecycle()
@@ -54,6 +56,18 @@ fun ServicesScreen(
     fun clientFullName(id: String) = clientMap[id]?.let { "${it.name} ${it.lastName}".trim() } ?: "Cliente"
     val professionalName = companyProfile.ownerName.ifBlank { companyProfile.companyName }.ifBlank { "Profesional asignado" }
     var detailAppointment by remember { mutableStateOf<Appointment?>(null) }
+
+    // Abrir ServiceDetailScreen directamente cuando se llega desde una notificación
+    LaunchedEffect(openDetailAppointmentId, allAppointments) {
+        if (openDetailAppointmentId != null && allAppointments.isNotEmpty()) {
+            val appt = allAppointments.find { it.id == openDetailAppointmentId }
+            if (appt != null) {
+                detailAppointment = appt
+                onDetailHandled()
+            }
+        }
+    }
+
     var showDialog   by remember { mutableStateOf(false) }
     var editOrder    by remember { mutableStateOf<ServiceOrder?>(null) }
     var showAppointmentDialog by remember { mutableStateOf(false) }
@@ -1064,6 +1078,29 @@ fun ScheduledAppointmentCard(
                                 fontWeight = FontWeight.Bold,
                                 color = statusColor
                             )
+                        }
+                        // Badge de asistencia
+                        when (appointment.attendanceStatus) {
+                            "SIN_ATENDER" -> Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFD32F2F).copy(alpha = 0.13f)
+                            ) {
+                                Text("SIN ATENDER",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFD32F2F))
+                            }
+                            "ATENDIDO_CON_RETRASO" -> Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFFF8F00).copy(alpha = 0.13f)
+                            ) {
+                                Text("CON RETRASO",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF8F00))
+                            }
                         }
                     }
                 }

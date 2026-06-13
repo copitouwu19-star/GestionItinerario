@@ -72,7 +72,9 @@ fun AgendaScreen(
     onNavigateToProfile: () -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: AgendaViewModel = hiltViewModel(),
-    profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel()
+    profileViewModel: com.gestion.itinerario.ui.profile.ProfileViewModel = hiltViewModel(),
+    openAppointmentId: String? = null,
+    onOpenHandled: () -> Unit = {}
 ) {
     val appointments by viewModel.appointments.collectAsStateWithLifecycle()
     val clients      by viewModel.clients.collectAsStateWithLifecycle()
@@ -101,6 +103,22 @@ fun AgendaScreen(
     var currentMonth by remember { mutableIntStateOf(today.get(Calendar.MONTH)) }
     var currentYear  by remember { mutableIntStateOf(today.get(Calendar.YEAR)) }
     var selectedDay  by remember { mutableIntStateOf(today.get(Calendar.DAY_OF_MONTH)) }
+
+    // Navegar al día de la cita y abrir su detalle cuando se llega desde una notificación
+    LaunchedEffect(openAppointmentId, appointments) {
+        if (openAppointmentId != null && appointments.isNotEmpty()) {
+            val appt = appointments.find { it.id == openAppointmentId }
+            if (appt != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = appt.dateTime }
+                currentMonth = cal.get(Calendar.MONTH)
+                currentYear  = cal.get(Calendar.YEAR)
+                selectedDay  = cal.get(Calendar.DAY_OF_MONTH)
+                editAppointment = appt
+                showDialog      = true
+                onOpenHandled()
+            }
+        }
+    }
 
     val citasByDay = remember(appointments, currentMonth, currentYear) {
         appointments.groupBy { appt ->
@@ -480,6 +498,22 @@ fun AppointmentCard(
                     AppointmentStatusStepper(status = a.status)
                 }
 
+                // Badge de asistencia (sin atender / con retraso)
+                if (a.attendanceStatus == "SIN_ATENDER" || a.attendanceStatus == "ATENDIDO_CON_RETRASO") {
+                    Spacer(Modifier.height(4.dp))
+                    val (badgeColor, badgeText) = when (a.attendanceStatus) {
+                        "SIN_ATENDER"          -> Color(0xFFD32F2F) to "SIN ATENDER"
+                        else                   -> Color(0xFFFF8F00) to "ATENDIDO CON RETRASO"
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = badgeColor.copy(alpha = 0.12f)) {
+                        Text(badgeText,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = badgeColor)
+                    }
+                }
+
                 // Aviso de recordatorio próximo (24h / 1h antes de la cita)
                 if (a.status == AppointmentStatus.SCHEDULED && client?.phone?.isNotBlank() == true) {
                     val hoursLeft = hoursUntil(a)
@@ -744,7 +778,10 @@ fun AppointmentFormDialog(
         calendar.set(y, m, d)
         dateStr = String.format("%02d/%02d/%04d", d, m + 1, y)
         timePicker.show()
-    }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
+    }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).also {
+        // No permitir fechas anteriores a hoy al crear/editar una cita
+        it.datePicker.minDate = System.currentTimeMillis() - 1000L
+    }
 
     // Diálogo de conflicto (overlay sobre el formulario)
     if (conflictAppointment != null && pendingSave != null) {

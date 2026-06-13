@@ -13,19 +13,23 @@ import com.gestion.itinerario.R
 class ReminderAlarmReceiver : BroadcastReceiver() {
 
     companion object {
-        const val CHANNEL_ID    = "reminders_channel"
-        const val EXTRA_TITLE   = "extra_title"
-        const val EXTRA_MESSAGE = "extra_message"
-        const val EXTRA_NOTIF_ID = "extra_notif_id"
+        const val CHANNEL_ID       = "reminders_channel"
+        const val EXTRA_TITLE      = "extra_title"
+        const val EXTRA_MESSAGE    = "extra_message"
+        const val EXTRA_NOTIF_ID   = "extra_notif_id"
+        const val EXTRA_ENTITY_ID  = "extra_entity_id"
+        const val EXTRA_ENTITY_TYPE = "extra_entity_type"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val title   = intent.getStringExtra(EXTRA_TITLE)   ?: "Recordatorio"
-        val message = intent.getStringExtra(EXTRA_MESSAGE) ?: ""
-        val notifId = intent.getIntExtra(EXTRA_NOTIF_ID, 2000)
+        val title      = intent.getStringExtra(EXTRA_TITLE)      ?: "Recordatorio"
+        val message    = intent.getStringExtra(EXTRA_MESSAGE)    ?: ""
+        val notifId    = intent.getIntExtra(EXTRA_NOTIF_ID, 2000)
+        val entityId   = intent.getStringExtra(EXTRA_ENTITY_ID)  ?: ""
+        val entityType = intent.getStringExtra(EXTRA_ENTITY_TYPE) ?: ""
 
         createChannel(context)
-        showNotification(context, notifId, title, message)
+        showNotification(context, notifId, title, message, entityId, entityType)
     }
 
     private fun createChannel(context: Context) {
@@ -44,9 +48,14 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showNotification(context: Context, id: Int, title: String, message: String) {
+    private fun showNotification(
+        context: Context, id: Int, title: String, message: String,
+        entityId: String, entityType: String
+    ) {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("entity_id", entityId)
+            putExtra("entity_type", entityType)
         }
         val contentPi = PendingIntent.getActivity(
             context, id,
