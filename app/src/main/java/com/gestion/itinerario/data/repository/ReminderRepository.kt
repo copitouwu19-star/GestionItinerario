@@ -1,98 +1,77 @@
 package com.gestion.itinerario.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.gestion.itinerario.data.entity.IntervalUnit
 import com.gestion.itinerario.data.entity.MaintenanceReminder
-import kotlinx.coroutines.channels.awaitClose
+import com.gestion.itinerario.data.remote.MantenimientoApiService
+import com.gestion.itinerario.data.remote.toRemoto
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ReminderRepository @Inject constructor(private val db: FirebaseFirestore) {
+class ReminderRepository @Inject constructor(private val api: MantenimientoApiService) {
 
     private val uid get() = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    private val col get() = db.collection("users").document(uid).collection("maintenanceReminders")
+    private val _reminders = MutableStateFlow<List<MaintenanceReminder>>(emptyList())
+    private var lastUid = ""
 
-    fun getActive(): Flow<List<MaintenanceReminder>> = callbackFlow {
-        if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = col.whereEqualTo("isActive", true).addSnapshotListener { snap, err ->
-            if (err != null) { close(err); return@addSnapshotListener }
-            trySend(snap?.documents?.mapNotNull { it.toReminder() } ?: emptyList())
+    private fun allReminders(): Flow<List<MaintenanceReminder>> = flow {
+        val currentUid = uid
+        if (currentUid.isNotEmpty() && currentUid != lastUid) {
+            lastUid = currentUid
+            refresh()
         }
-        awaitClose { reg.remove() }
+        emitAll(_reminders)
     }
+
+    fun getActive(): Flow<List<MaintenanceReminder>> =
+        allReminders().map { list -> list.filter { it.isActive } }
 
     fun getByEquipment(id: String): Flow<List<MaintenanceReminder>> =
         getActive().map { list -> list.filter { it.equipmentId == id } }
 
     suspend fun getDue(date: Long): List<MaintenanceReminder> =
-        col.whereEqualTo("isActive", true).get().await()
-            .documents.mapNotNull { it.toReminder() }
-            .filter { it.nextServiceDate <= date }
+        _reminders.value.filter { it.isActive && it.nextServiceDate <= date }
 
     suspend fun save(r: MaintenanceReminder): String {
-        val ref = if (r.id.isEmpty()) col.document() else col.document(r.id)
-        try { withTimeout(5_000L) { ref.set(r.toMap()).await() } } catch (_: Exception) {}
-        return ref.id
+        val id = r.id.ifEmpty { UUID.randomUUID().toString() }
+        val reminder = r.copy(id = id)
+        try { api.save(reminder.toRemoto(uid)) } catch (_: Exception) {}
+        val list = _reminders.value.toMutableList().apply {
+            removeAll { it.id == id }
+            add(reminder)
+        }
+        _reminders.value = list.sortedBy { it.nextServiceDate }
+        return id
     }
 
     suspend fun getById(id: String): MaintenanceReminder? =
-        col.document(id).get().await().toReminder()
+        _reminders.value.firstOrNull { it.id == id }
 
     suspend fun update(r: MaintenanceReminder) {
-        try { withTimeout(5_000L) { col.document(r.id).set(r.toMap()).await() } } catch (_: Exception) {}
+        try { api.update(r.id, r.toRemoto(uid)) } catch (_: Exception) {}
+        _reminders.value = _reminders.value.map { if (it.id == r.id) r else it }
     }
+
     suspend fun delete(r: MaintenanceReminder) {
-        try { withTimeout(5_000L) { col.document(r.id).delete().await() } } catch (_: Exception) {}
+        try { api.delete(r.id) } catch (_: Exception) {}
+        _reminders.value = _reminders.value.filter { it.id != r.id }
     }
-}
 
-private fun MaintenanceReminder.toMap(): Map<String, Any?> = mapOf(
-    "equipmentId" to equipmentId,
-    "equipmentType" to equipmentType,
-    "clientId" to clientId,
-    "intervalValue" to intervalValue,
-    "intervalUnit" to intervalUnit.name,
-    "intervalMonths" to intervalMonths,
-    "lastServiceDate" to lastServiceDate,
-    "nextServiceDate" to nextServiceDate,
-    "notes" to notes,
-    "isActive" to isActive,
-    "source" to source,
-    "workStatus" to workStatus,
-    "photosBefore" to photosBefore,
-    "photosDuring" to photosDuring,
-    "photosAfter" to photosAfter
-)
-
-private fun com.google.firebase.firestore.DocumentSnapshot.toReminder(): MaintenanceReminder? {
-    if (!exists()) return null
-    return try {
-        val unit = runCatching { IntervalUnit.valueOf(getString("intervalUnit") ?: "MONTHS") }.getOrDefault(IntervalUnit.MONTHS)
-        val value = getLong("intervalValue")?.toInt() ?: getLong("intervalMonths")?.toInt() ?: 3
-        MaintenanceReminder(
-            id = id,
-            equipmentId = getString("equipmentId") ?: "",
-            equipmentType = getString("equipmentType") ?: "",
-            clientId = getString("clientId") ?: "",
-            intervalValue = value,
-            intervalUnit = unit,
-            intervalMonths = getLong("intervalMonths")?.toInt() ?: 3,
-            lastServiceDate = getLong("lastServiceDate") ?: 0L,
-            nextServiceDate = getLong("nextServiceDate") ?: 0L,
-            notes = getString("notes") ?: "",
-            isActive = getBoolean("isActive") ?: true,
-            source = getString("source") ?: com.gestion.itinerario.data.entity.REMINDER_SOURCE_MANUAL,
-            workStatus = getString("workStatus") ?: "PENDING",
-            photosBefore = (get("photosBefore") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
-            photosDuring = (get("photosDuring") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
-            photosAfter  = (get("photosAfter")  as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
-        )
-    } catch (e: Exception) { null }
+    suspend fun refresh() {
+        val currentUid = uid
+        if (currentUid.isEmpty()) return
+        try {
+            val resp = api.getAll(currentUid)
+            if (resp.isSuccessful) {
+                _reminders.value = resp.body()?.data?.map { it.toDomain() }
+                    ?.sortedBy { it.nextServiceDate } ?: emptyList()
+            }
+        } catch (_: Exception) {}
+    }
 }

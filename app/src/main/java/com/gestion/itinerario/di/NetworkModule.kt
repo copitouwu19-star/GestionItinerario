@@ -1,5 +1,9 @@
 package com.gestion.itinerario.di
 
+import com.gestion.itinerario.data.remote.CitaApiService
+import com.gestion.itinerario.data.remote.ClientApiService
+import com.gestion.itinerario.data.remote.MantenimientoApiService
+import com.gestion.itinerario.data.remote.PerfilApiService
 import com.gestion.itinerario.data.remote.UsuarioApiService
 import dagger.Module
 import dagger.Provides
@@ -47,4 +51,24 @@ object NetworkModule {
     @Singleton
     fun provideUsuarioApiService(retrofit: Retrofit): UsuarioApiService =
         retrofit.create(UsuarioApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideClientApiService(retrofit: Retrofit): ClientApiService =
+        retrofit.create(ClientApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideCitaApiService(retrofit: Retrofit): CitaApiService =
+        retrofit.create(CitaApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideMantenimientoApiService(retrofit: Retrofit): MantenimientoApiService =
+        retrofit.create(MantenimientoApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun providePerfilApiService(retrofit: Retrofit): PerfilApiService =
+        retrofit.create(PerfilApiService::class.java)
 }

@@ -1,29 +1,32 @@
 package com.gestion.itinerario.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.gestion.itinerario.data.entity.Client
-import kotlinx.coroutines.channels.awaitClose
+import com.gestion.itinerario.data.remote.ClientApiService
+import com.gestion.itinerario.data.remote.toRemoto
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ClientRepository @Inject constructor(private val db: FirebaseFirestore) {
+class ClientRepository @Inject constructor(private val api: ClientApiService) {
 
     private val uid get() = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    private val col get() = db.collection("users").document(uid).collection("clients")
+    private val _clients = MutableStateFlow<List<Client>>(emptyList())
+    private var lastUid = ""
 
-    fun getAll(): Flow<List<Client>> = callbackFlow {
-        if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = col.orderBy("name").addSnapshotListener { snap, err ->
-            if (err != null) { close(err); return@addSnapshotListener }
-            trySend(snap?.documents?.mapNotNull { it.toClient() } ?: emptyList())
+    fun getAll(): Flow<List<Client>> = flow {
+        val currentUid = uid
+        if (currentUid.isNotEmpty() && currentUid != lastUid) {
+            lastUid = currentUid
+            refresh()
         }
-        awaitClose { reg.remove() }
+        emitAll(_clients)
     }
 
     fun search(query: String): Flow<List<Client>> = getAll().map { list ->
@@ -36,42 +39,44 @@ class ClientRepository @Inject constructor(private val db: FirebaseFirestore) {
         }
     }
 
-    suspend fun getById(id: String): Client? = col.document(id).get().await().toClient()
-
-    suspend fun save(client: Client): String {
-        val ref = if (client.id.isEmpty()) col.document() else col.document(client.id)
-        ref.set(client.toMap()).await()
-        return ref.id
+    suspend fun getById(id: String): Client? {
+        val cached = _clients.value.firstOrNull { it.id == id }
+        if (cached != null) return cached
+        refresh()
+        return _clients.value.firstOrNull { it.id == id }
     }
 
-    suspend fun update(client: Client) { col.document(client.id).set(client.toMap()).await() }
-    suspend fun delete(client: Client) { col.document(client.id).delete().await() }
-}
+    suspend fun save(client: Client): String {
+        val id = client.id.ifEmpty { UUID.randomUUID().toString() }
+        val c = client.copy(id = id)
+        try { api.save(c.toRemoto(uid)) } catch (_: Exception) {}
+        val list = _clients.value.toMutableList().apply {
+            removeAll { it.id == id }
+            add(c)
+        }
+        _clients.value = list.sortedBy { it.name }
+        return id
+    }
 
-private fun Client.toMap(): Map<String, Any?> = mapOf(
-    "name" to name,
-    "lastName" to lastName,
-    "phone" to phone,
-    "email" to email,
-    "address" to address,
-    "notes" to notes,
-    "clientType" to clientType,
-    "createdAt" to createdAt
-)
+    suspend fun update(client: Client) {
+        try { api.update(client.id, client.toRemoto(uid)) } catch (_: Exception) {}
+        _clients.value = _clients.value.map { if (it.id == client.id) client else it }
+    }
 
-private fun com.google.firebase.firestore.DocumentSnapshot.toClient(): Client? {
-    if (!exists()) return null
-    return try {
-        Client(
-            id = id,
-            name = getString("name") ?: "",
-            lastName = getString("lastName") ?: "",
-            phone = getString("phone") ?: "",
-            email = getString("email") ?: "",
-            address = getString("address") ?: "",
-            notes = getString("notes") ?: "",
-            clientType = getString("clientType") ?: "Persona Natural",
-            createdAt = getLong("createdAt") ?: System.currentTimeMillis()
-        )
-    } catch (e: Exception) { null }
+    suspend fun delete(client: Client) {
+        try { api.delete(client.id) } catch (_: Exception) {}
+        _clients.value = _clients.value.filter { it.id != client.id }
+    }
+
+    suspend fun refresh() {
+        val currentUid = uid
+        if (currentUid.isEmpty()) return
+        try {
+            val resp = api.getAll(currentUid)
+            if (resp.isSuccessful) {
+                _clients.value = resp.body()?.data?.map { it.toDomain() }
+                    ?.sortedBy { it.name } ?: emptyList()
+            }
+        } catch (_: Exception) {}
+    }
 }

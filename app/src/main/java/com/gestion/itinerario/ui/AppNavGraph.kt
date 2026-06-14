@@ -16,6 +16,7 @@ import com.gestion.itinerario.ui.auth.LoginScreen
 import com.gestion.itinerario.ui.auth.RegisterScreen
 import com.gestion.itinerario.ui.clients.ClientsScreen
 import com.gestion.itinerario.ui.dashboard.DashboardScreen
+import com.gestion.itinerario.ui.onboarding.OnboardingScreen
 import com.gestion.itinerario.ui.profile.ProfileScreen
 import com.gestion.itinerario.ui.reminders.RemindersScreen
 import com.gestion.itinerario.ui.services.ServicesScreen
@@ -40,6 +41,7 @@ object Routes {
     const val LOGIN           = "login"
     const val REGISTER        = "register"
     const val FORGOT_PASSWORD = "forgot_password"
+    const val ONBOARDING      = "onboarding"
     const val DASHBOARD       = "dashboard"
     const val INVENTORY       = "inventory"
     const val CLIENTS         = "clients"
@@ -48,7 +50,8 @@ object Routes {
     const val REMINDERS       = "reminders"
     const val PROFILE         = "profile"
 
-    val authRoutes = setOf(LOGIN, REGISTER, FORGOT_PASSWORD)
+    // Rutas que ocultan el bottom nav
+    val authRoutes = setOf(LOGIN, REGISTER, FORGOT_PASSWORD, ONBOARDING)
 }
 
 @Composable
@@ -100,7 +103,8 @@ fun AppNavGraph(
             MaterialTheme(colorScheme = AuthBlueScheme) {
                 RegisterScreen(
                     onRegisterSuccess = {
-                        navController.navigate(Routes.DASHBOARD) {
+                        // Tras el registro, va al onboarding (no al dashboard directamente)
+                        navController.navigate(Routes.ONBOARDING) {
                             popUpTo(Routes.LOGIN) { inclusive = true }
                         }
                     },
@@ -112,6 +116,17 @@ fun AppNavGraph(
             MaterialTheme(colorScheme = AuthBlueScheme) {
                 ForgotPasswordScreen(onBack = { navController.popBackStack() })
             }
+        }
+
+        // ── Onboarding (sólo primera vez, tras el registro) ───────────────────
+        composable(Routes.ONBOARDING) {
+            OnboardingScreen(
+                onFinish = {
+                    navController.navigate(Routes.DASHBOARD) {
+                        popUpTo(Routes.ONBOARDING) { inclusive = true }
+                    }
+                }
+            )
         }
 
         // ── Main ──────────────────────────────────────────────────────────────

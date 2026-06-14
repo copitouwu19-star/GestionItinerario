@@ -21,7 +21,7 @@ class EquipmentRepository @Inject constructor(private val db: FirebaseFirestore)
     fun getAll(): Flow<List<Equipment>> = callbackFlow {
         if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
         val reg = col.addSnapshotListener { snap, err ->
-            if (err != null) { close(err); return@addSnapshotListener }
+            if (err != null) { trySend(emptyList()); return@addSnapshotListener }
             trySend(snap?.documents?.mapNotNull { it.toEquipment() } ?: emptyList())
         }
         awaitClose { reg.remove() }

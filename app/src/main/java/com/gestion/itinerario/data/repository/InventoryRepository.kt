@@ -24,7 +24,7 @@ class InventoryRepository @Inject constructor(private val db: FirebaseFirestore)
     fun getAllSpareParts(): Flow<List<SparePart>> = callbackFlow {
         if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
         val reg = partsCol.orderBy("name").addSnapshotListener { snap, err ->
-            if (err != null) { close(err); return@addSnapshotListener }
+            if (err != null) { trySend(emptyList()); return@addSnapshotListener }
             trySend(snap?.documents?.mapNotNull { it.toSparePart() } ?: emptyList())
         }
         awaitClose { reg.remove() }
@@ -40,7 +40,7 @@ class InventoryRepository @Inject constructor(private val db: FirebaseFirestore)
         if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
         val reg = movementsCol.whereEqualTo("sparePartId", sparePartId)
             .orderBy("date").addSnapshotListener { snap, err ->
-                if (err != null) { close(err); return@addSnapshotListener }
+                if (err != null) { trySend(emptyList()); return@addSnapshotListener }
                 trySend(snap?.documents?.mapNotNull { it.toStockMovement() } ?: emptyList())
             }
         awaitClose { reg.remove() }

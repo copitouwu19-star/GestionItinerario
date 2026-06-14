@@ -1,34 +1,35 @@
 package com.gestion.itinerario.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.gestion.itinerario.data.entity.Appointment
 import com.gestion.itinerario.data.entity.AppointmentStatus
-import com.gestion.itinerario.data.entity.ServiceType
-import kotlinx.coroutines.channels.awaitClose
+import com.gestion.itinerario.data.remote.CitaApiService
+import com.gestion.itinerario.data.remote.toRemota
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import java.util.Calendar
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AppointmentRepository @Inject constructor(private val db: FirebaseFirestore) {
+class AppointmentRepository @Inject constructor(private val api: CitaApiService) {
 
     private val uid get() = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    private val col get() = db.collection("users").document(uid).collection("appointments")
+    private val _appointments = MutableStateFlow<List<Appointment>>(emptyList())
+    private var lastUid = ""
 
-    fun getAll(): Flow<List<Appointment>> = callbackFlow {
-        if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
-        val reg = col.orderBy("dateTime").addSnapshotListener { snap, err ->
-            if (err != null) { close(err); return@addSnapshotListener }
-            trySend(snap?.documents?.mapNotNull { it.toAppointment() } ?: emptyList())
+    fun getAll(): Flow<List<Appointment>> = flow {
+        val currentUid = uid
+        if (currentUid.isNotEmpty() && currentUid != lastUid) {
+            lastUid = currentUid
+            refresh()
         }
-        awaitClose { reg.remove() }
+        emitAll(_appointments)
     }
 
     fun getUpcoming(from: Long = System.currentTimeMillis()): Flow<List<Appointment>> =
@@ -49,27 +50,49 @@ class AppointmentRepository @Inject constructor(private val db: FirebaseFirestor
     suspend fun checkConflict(dateTime: Long, excludeId: String = ""): Appointment? {
         val from = dateTime - TimeUnit.MINUTES.toMillis(1)
         val to = dateTime + TimeUnit.MINUTES.toMillis(1)
-        return col.get().await().documents.mapNotNull { it.toAppointment() }
-            .firstOrNull { it.id != excludeId && it.status == AppointmentStatus.SCHEDULED && it.dateTime in from..to }
+        return _appointments.value.firstOrNull {
+            it.id != excludeId && it.status == AppointmentStatus.SCHEDULED && it.dateTime in from..to
+        }
     }
 
     suspend fun getInRange(from: Long, to: Long): List<Appointment> =
-        col.get().await().documents.mapNotNull { it.toAppointment() }.filter { it.dateTime in from..to }
+        _appointments.value.filter { it.dateTime in from..to }
 
-    suspend fun getById(id: String): Appointment? = col.document(id).get().await().toAppointment()
+    suspend fun getById(id: String): Appointment? =
+        _appointments.value.firstOrNull { it.id == id }
 
     suspend fun save(app: Appointment): String {
-        val ref = if (app.id.isEmpty()) col.document() else col.document(app.id)
-        // Timeout igual que Invoice/Quote: Firestore escribe en caché local aunque el await no retorne
-        try { withTimeout(5_000L) { ref.set(app.toMap()).await() } } catch (_: Exception) {}
-        return ref.id
+        val id = app.id.ifEmpty { UUID.randomUUID().toString() }
+        val a = app.copy(id = id)
+        try { api.save(a.toRemota(uid)) } catch (_: Exception) {}
+        val list = _appointments.value.toMutableList().apply {
+            removeAll { it.id == id }
+            add(a)
+        }
+        _appointments.value = list.sortedBy { it.dateTime }
+        return id
     }
 
     suspend fun update(app: Appointment) {
-        try { withTimeout(5_000L) { col.document(app.id).set(app.toMap()).await() } } catch (_: Exception) {}
+        try { api.update(app.id, app.toRemota(uid)) } catch (_: Exception) {}
+        _appointments.value = _appointments.value.map { if (it.id == app.id) app else it }
     }
+
     suspend fun delete(app: Appointment) {
-        try { withTimeout(5_000L) { col.document(app.id).delete().await() } } catch (_: Exception) {}
+        try { api.delete(app.id) } catch (_: Exception) {}
+        _appointments.value = _appointments.value.filter { it.id != app.id }
+    }
+
+    suspend fun refresh() {
+        val currentUid = uid
+        if (currentUid.isEmpty()) return
+        try {
+            val resp = api.getAll(currentUid)
+            if (resp.isSuccessful) {
+                _appointments.value = resp.body()?.data?.map { it.toDomain() }
+                    ?.sortedBy { it.dateTime } ?: emptyList()
+            }
+        } catch (_: Exception) {}
     }
 
     private fun todayRange(): Pair<Long, Long> {
@@ -81,43 +104,4 @@ class AppointmentRepository @Inject constructor(private val db: FirebaseFirestor
         cal.set(Calendar.SECOND, 59); cal.set(Calendar.MILLISECOND, 999)
         return Pair(start, cal.timeInMillis)
     }
-}
-
-private fun Appointment.toMap(): Map<String, Any?> = mapOf(
-    "clientId" to clientId,
-    "equipmentId" to equipmentId,
-    "dateTime" to dateTime,
-    "serviceType" to serviceType.name,
-    "status" to status.name,
-    "notes" to notes,
-    "equipmentType" to equipmentType,
-    "createdAt" to createdAt,
-    "photosBefore" to photosBefore,
-    "photosDuring" to photosDuring,
-    "photosAfter" to photosAfter,
-    "completedAt" to completedAt,
-    "attendanceStatus" to attendanceStatus
-)
-
-@Suppress("UNCHECKED_CAST")
-private fun com.google.firebase.firestore.DocumentSnapshot.toAppointment(): Appointment? {
-    if (!exists()) return null
-    return try {
-        Appointment(
-            id = id,
-            clientId = getString("clientId") ?: "",
-            equipmentId = getString("equipmentId"),
-            dateTime = getLong("dateTime") ?: 0L,
-            serviceType = ServiceType.valueOf(getString("serviceType") ?: "MAINTENANCE"),
-            status = AppointmentStatus.valueOf(getString("status") ?: "SCHEDULED"),
-            notes = getString("notes") ?: "",
-            equipmentType = getString("equipmentType") ?: "",
-            createdAt = getLong("createdAt") ?: System.currentTimeMillis(),
-            photosBefore = (get("photosBefore") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            photosDuring = (get("photosDuring") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            photosAfter  = (get("photosAfter")  as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            completedAt      = getLong("completedAt"),
-            attendanceStatus = getString("attendanceStatus") ?: ""
-        )
-    } catch (e: Exception) { null }
 }

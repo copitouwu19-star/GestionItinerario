@@ -23,7 +23,7 @@ class QuoteRepository @Inject constructor(private val db: FirebaseFirestore) {
     fun getAll(): Flow<List<Quote>> = callbackFlow {
         if (uid.isEmpty()) { trySend(emptyList()); close(); return@callbackFlow }
         val reg = col.orderBy("createdAt").addSnapshotListener { snap, err ->
-            if (err != null) { close(err); return@addSnapshotListener }
+            if (err != null) { trySend(emptyList()); return@addSnapshotListener }
             trySend(snap?.documents?.mapNotNull { it.toQuote() } ?: emptyList())
         }
         awaitClose { reg.remove() }
